@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="SharedActivityManager.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:SharedActivityManager"
+    Title="SharedActivityManager">
+
+    <ShellContent
+        Title="Activity"
+        ContentTemplate="{DataTemplate local:MainPage}"
+        Route="MainPage" />
+
+    <ShellContent
+        Title="Chat"
+        ContentTemplate="{DataTemplate local:ChatPage}"
+        Route="ChatPage" />
+
+    <ShellContent
+        Title="Account"
+        ContentTemplate="{DataTemplate local:AccountPage}"
+        Route="AccountPage" />
+
+    <ShellContent
+        Title="Settings"
+        ContentTemplate="{DataTemplate local:SettingsPage}"
+        Route="SettingsPage" />
+
+</Shell>

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:media="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui.MediaElement"
+             x:Class="SharedActivityManager.RingtonePickerPage"
+             Title="Choose Ringtone">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Padding="15" RowSpacing="10">
+
+        <!-- MediaElement pentru redare audio -->
+        <media:MediaElement x:Name="MediaPlayer"
+                           Grid.Row="0"
+                           ShouldAutoPlay="True"
+                           ShouldKeepScreenOn="True"
+                           IsVisible="False"
+                           HeightRequest="0"
+                           WidthRequest="0"/>
+
+        <!-- Buton pentru import muzică -->
+        <Button Grid.Row="1"
+                Text="📁 Import Music from Computer"
+                BackgroundColor="#4CAF50"
+                TextColor="White"
+                FontSize="16"
+                CornerRadius="8"
+                HeightRequest="50"
+                Clicked="OnImportMusicClicked"
+                Margin="0,0,0,10"/>
+
+        <!-- Search Bar -->
+        <Frame Grid.Row="2" 
+               CornerRadius="10"
+               Padding="5"
+               BorderColor="#E0E0E0">
+            <SearchBar x:Name="SearchBar"
+                      Placeholder="Search ringtones..."
+                      BackgroundColor="Transparent"
+                      TextChanged="OnSearchTextChanged"/>
+        </Frame>
+
+        <!-- Ringtones List -->
+        <CollectionView x:Name="RingtonesCollectionView"
+                       Grid.Row="3"
+                       ItemsSource="{Binding FilteredRingtones}"
+                       SelectionMode="None">
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Border Stroke="#E0E0E0"
+                            StrokeThickness="1"
+                            StrokeShape="RoundRectangle 8"
+                            Padding="12"
+                            Margin="0,5">
+
+                        <Grid ColumnDefinitions="*, Auto">
+
+                            <VerticalStackLayout Grid.Column="0" Spacing="5">
+                                <Label Text="{Binding DisplayName}" 
+                                       FontSize="16"
+                                       FontAttributes="Bold"
+                                       TextColor="#333333"/>
+                                <Label Text="{Binding SourceType}" 
+                                       FontSize="12" 
+                                       TextColor="#666666"/>
+                            </VerticalStackLayout>
+
+                            <Button Grid.Column="1"
+                                    Text="▶️ Play"
+                                    BackgroundColor="#2196F3"
+                                    TextColor="White"
+                                    CornerRadius="15"
+                                    Padding="15,8"
+                                    CommandParameter="{Binding .}"
+                                    Clicked="OnPlayRingtoneClicked"/>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Bottom Buttons -->
+        <Border Grid.Row="4"
+                Stroke="#E0E0E0"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 10"
+                Padding="15">
+
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+
+                <Button Grid.Column="0"
+                        Text="⏹️ Stop"
+                        BackgroundColor="#F44336"
+                        TextColor="White"
+                        CornerRadius="8"
+                        Clicked="OnStopRingtoneClicked"
+                        IsVisible="{Binding IsPlaying}"/>
+
+                <Button Grid.Column="1"
+                        Text="✅ Select"
+                        BackgroundColor="#4CAF50"
+                        TextColor="White"
+                        CornerRadius="8"
+                        Clicked="OnSelectRingtoneClicked"/>
+
+                <Button Grid.Column="2"
+                        Text="❌ Cancel"
+                        BackgroundColor="#9E9E9E"
+                        TextColor="White"
+                        CornerRadius="8"
+                        Clicked="OnCancelClicked"/>
+            </Grid>
+        </Border>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,94 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:SharedActivityManager.ViewModels"
+             xmlns:converters="clr-namespace:SharedActivityManager.Converters"
+             x:Class="SharedActivityManager.MainPage"
+             Title="Activity List">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:BoolToTextColorConverter x:Key="BoolToTextColor"/>
+            <converters:BoolToTextDecorationConverter x:Key="BoolToTextDecoration"/>
+            <converters:BoolToCompleteIconConverter x:Key="BoolToCompleteIcon"/>
+            <converters:StringNotNullOrEmptyConverter x:Key="StringNotNullOrEmpty"/>
+            <converters:ActivityTypeToStringConverter x:Key="ActivityTypeToString"/>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <ScrollView Padding="20">
+        <VerticalStackLayout Spacing="20">
+
+            <Label Text="Activity List"
+                   FontSize="28"
+                   FontAttributes="Bold"
+                   TextColor="#2196F3"
+                   HorizontalOptions="Center"
+                   Margin="0,10,0,20"/>
+
+            <Button Text="+ Create Activity" 
+                    Clicked="OnModalOpen" 
+                    BackgroundColor="#4CAF50"
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="50"
+                    Margin="10"/>
+
+            <CollectionView ItemsSource="{Binding Activities}"
+               EmptyView="No activities yet. Create your first activity!"
+               SelectionMode="Single"
+               SelectionChanged="OnActivitySelected">
+
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Border Stroke="#E0E0E0"
+                                StrokeThickness="1"
+                                StrokeShape="RoundRectangle 10"
+                                Padding="15"
+                                Margin="5">
+
+                            <Grid ColumnDefinitions="*, Auto">
+
+                                <!-- Informații activitate (partea stângă) -->
+                                <VerticalStackLayout Grid.Column="0" Spacing="8">
+                                    <Label Text="{Binding Title}" 
+                                           FontSize="18" 
+                                           FontAttributes="Bold"
+                                           TextColor="{Binding isCompleted, Converter={StaticResource BoolToTextColor}}"
+                                           TextDecorations="{Binding isCompleted, Converter={StaticResource BoolToTextDecoration}}"/>
+
+                                    <Label Text="{Binding Desc}" 
+                                           FontSize="14" 
+                                           TextColor="#666666"
+                                           IsVisible="{Binding Desc, Converter={StaticResource StringNotNullOrEmpty}}"/>
+
+                                    <HorizontalStackLayout Spacing="15">
+                                        <Label Text="{Binding TypeId, Converter={StaticResource ActivityTypeToString}}" 
+                                               FontSize="12" 
+                                               TextColor="#2196F3"/>
+                                        <Label Text="{Binding StartDate, StringFormat='{0:dd.MM.yyyy}'}" 
+                                               FontSize="12" 
+                                               TextColor="#FF9800"/>
+                                        <Label Text="{Binding StartTime, StringFormat='{0:HH:mm}'}" 
+                                               FontSize="12" 
+                                               TextColor="#4CAF50"/>
+                                    </HorizontalStackLayout>
+                                </VerticalStackLayout>
+
+                                <!-- Buton pentru toggle complete (partea dreaptă) -->
+                                <ImageButton Grid.Column="1"
+                                            Source="{Binding isCompleted, Converter={StaticResource BoolToCompleteIcon}}"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MainViewModel}}, Path=ToggleCompleteCommand}"
+                                            CommandParameter="{Binding .}"
+                                            HeightRequest="35"
+                                            WidthRequest="35"
+                                            BackgroundColor="Transparent"
+                                            HorizontalOptions="End"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:SharedActivityManager.ViewModels"
+             x:Class="SharedActivityManager.ActivityModal"
+             Title="{Binding Title}">
+
+    <ScrollView Padding="20">
+        <VerticalStackLayout Spacing="20">
+
+            <!-- Dynamic Title based on mode -->
+            <Label Text="{Binding PageTitle}"
+                   FontSize="28"
+                   FontAttributes="Bold"
+                   TextColor="#2196F3"
+                   HorizontalOptions="Center"
+                   Margin="0,10,0,20"/>
+
+            <!-- Title Input -->
+            <Border Stroke="#E0E0E0"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 10"
+                    Padding="15">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Title *" 
+                           FontSize="14" 
+                           FontAttributes="Bold" 
+                           TextColor="#666666"/>
+                    <Entry Placeholder="Enter activity title"
+                           Text="{Binding NewTaskTitle, Mode=TwoWay}"
+                           FontSize="16" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Description Input -->
+            <Border Stroke="#E0E0E0"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 10"
+                    Padding="15">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Description" 
+                           FontSize="14" 
+                           FontAttributes="Bold" 
+                           TextColor="#666666"/>
+                    <Editor Placeholder="Enter activity description"
+                           Text="{Binding NewTaskDesc, Mode=TwoWay}"
+                           FontSize="16"
+                           HeightRequest="100"
+                           AutoSize="TextChanges"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Activity Type Picker -->
+            <Border Stroke="#E0E0E0"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 10"
+                    Padding="15">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Activity Type" 
+                           FontSize="14" 
+                           FontAttributes="Bold" 
+                           TextColor="#666666"/>
+                    <Picker ItemsSource="{Binding ActivityTypeList}"
+                           SelectedItem="{Binding SelectedActivityType, Mode=TwoWay}"
+                           FontSize="16"
+                           Title="Select activity type" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Date and Time Picker -->
+            <Border Stroke="#E0E0E0"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 10"
+                    Padding="15">
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="Date and Time" 
+                           FontSize="14" 
+                           FontAttributes="Bold" 
+                           TextColor="#666666"/>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <Border Grid.Column="0" 
+                                Stroke="#E0E0E0"
+                                StrokeThickness="1"
+                                StrokeShape="RoundRectangle 8">
+                            <HorizontalStackLayout Padding="10,8" Spacing="8">
+                                <Label Text="📅" FontSize="18" VerticalOptions="Center"/>
+                                <DatePicker Date="{Binding SelectedStartDate, Mode=TwoWay}"
+                                           MinimumDate="{Binding Today}"
+                                           FontSize="16"
+                                           BackgroundColor="Transparent"
+                                           HorizontalOptions="FillAndExpand"
+                                           Format="dd.MM.yyyy"/>
+                            </HorizontalStackLayout>
+                        </Border>
+
+                        <Border Grid.Column="1" 
+                                Stroke="#E0E0E0"
+                                StrokeThickness="1"
+                                StrokeShape="RoundRectangle 8">
+                            <HorizontalStackLayout Padding="10,8" Spacing="8">
+                                <Label Text="⏰" FontSize="18" VerticalOptions="Center"/>
+                                <TimePicker Time="{Binding SelectedStartTime, Mode=TwoWay}"
+                                           FontSize="16"
+                                           BackgroundColor="Transparent"
+                                           HorizontalOptions="FillAndExpand"
+                                           Format="HH:mm" />
+                            </HorizontalStackLayout>
+                        </Border>
+                    </Grid>
+
+                    <Label Text="{Binding CombinedStartDateTime, StringFormat='Selected: {0:dddd, dd MMMM yyyy HH:mm}'}"
+                           FontSize="14"
+                           TextColor="#2196F3"
+                           HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Alarm Settings -->
+            <Border Stroke="#E0E0E0"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 10"
+                    Padding="15">
+                <VerticalStackLayout Spacing="15">
+                    <Grid ColumnDefinitions="*, Auto">
+                        <Label Grid.Column="0" 
+                               Text="Set Alarm" 
+                               FontSize="16" 
+                               FontAttributes="Bold" 
+                               TextColor="#666666"
+                               VerticalOptions="Center"/>
+                        <Switch Grid.Column="1"
+                               IsToggled="{Binding AlarmSet, Mode=TwoWay}"
+                               OnColor="#2196F3"
+                               ThumbColor="White"/>
+                    </Grid>
+
+                    <VerticalStackLayout IsVisible="{Binding AlarmSet}" Spacing="8">
+                        <Label Text="Reminder Frequency" 
+                               FontSize="14" 
+                               FontAttributes="Bold" 
+                               TextColor="#666666"/>
+                        <Picker ItemsSource="{Binding ReminderTypeList}"
+                               SelectedItem="{Binding SelectedReminderType, Mode=TwoWay}"
+                               FontSize="16"
+                               Title="Select reminder frequency" />
+
+                        <HorizontalStackLayout Spacing="5" Margin="0,10,0,0">
+                            <Label Text="📨 Next reminder:" 
+                                   FontSize="13" 
+                                   TextColor="#666666"/>
+                            <Label Text="{Binding NextReminderDatePreview, StringFormat='{0:dd.MM.yyyy HH:mm}'}"
+                                   FontSize="13"
+                                   FontAttributes="Bold"
+                                   TextColor="#9C27B0"/>
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Ringtone Picker -->
+            <Border Stroke="#E0E0E0"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 10"
+                    Padding="15">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Ringtone" 
+                           FontSize="14" 
+                           FontAttributes="Bold" 
+                           TextColor="#666666"/>
+
+                    <Grid ColumnDefinitions="*, Auto" ColumnSpacing="10">
+
+                        <!-- Afișare ringtone selectat -->
+                        <Border Grid.Column="0"
+                                Stroke="#2196F3"
+                                StrokeThickness="1"
+                                StrokeShape="RoundRectangle 8"
+                                Padding="10"
+                                BackgroundColor="#F0F8FF">
+                            <HorizontalStackLayout Spacing="8" HorizontalOptions="Center">
+                                <Label Text="🔔" FontSize="16"/>
+                                <Label x:Name="SelectedRingtoneDisplay"
+                                       Text="{Binding SelectedRingTone}"
+                                       FontSize="14"
+                                       TextColor="#2196F3"
+                                       VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Border>
+
+                        <!-- Buton pentru a alege ringtone -->
+                        <Button Grid.Column="1"
+                                Text="Choose"
+                                BackgroundColor="#2196F3"
+                                TextColor="White"
+                                CornerRadius="8"
+                                Padding="15,10"
+                                Clicked="OnChooseRingtoneClicked"/>
+                    </Grid>
+
+                    <!-- Previzualizare ringtone (opțional) -->
+                    <Label Text="Tap 'Choose' to select from available ringtones"
+                           FontSize="11"
+                           TextColor="#999999"
+                           Margin="0,5,0,0"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Butoane acțiune -->
+            <!-- Butoane acțiune -->
+            <VerticalStackLayout Spacing="10" Margin="0,20,0,0">
+
+                <!-- Save Button -->
+                <Button Text="💾 Save Activity"
+                        Clicked="OnSaveActivity"
+                        BackgroundColor="#4CAF50"
+                        TextColor="White"
+                        FontSize="18"
+                        FontAttributes="Bold"
+                        CornerRadius="25"
+                        HeightRequest="55"/>
+
+                <!-- Delete Button - Ar trebui să fie vizibil doar în mod editare -->
+                <Button Text="🗑️ Delete Activity"
+                        Clicked="OnDeleteActivity"
+                        BackgroundColor="#F44336"
+                        TextColor="White"
+                        FontSize="16"
+                        FontAttributes="Bold"
+                        CornerRadius="25"
+                        HeightRequest="50"
+                        IsVisible="{Binding IsEditMode}"/>
+                <!-- ACEASTA LINIE ESTE CRITICĂ -->
+
+                <!-- Close Button -->
+                <Button Text="❌ Cancel"
+                        Clicked="OnCloseModal"
+                        BackgroundColor="#9E9E9E"
+                        TextColor="White"
+                        FontSize="16"
+                        CornerRadius="25"
+                        HeightRequest="50"/>
+            </VerticalStackLayout>
+
+            <Label Text="* Required fields"
+                   FontSize="12"
+                   TextColor="#999999"
+                   HorizontalOptions="Center"
+                   Margin="0,10"/>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

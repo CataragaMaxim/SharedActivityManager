@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="SharedActivityManager.AlarmNotificationPage"
+             BackgroundColor="#50000000">
+
+    <Border Stroke="#2196F3"
+            StrokeThickness="3"
+            StrokeShape="RoundRectangle 20"
+            BackgroundColor="White"
+            Padding="20"
+            WidthRequest="300"
+            HeightRequest="400"
+            HorizontalOptions="Center"
+            VerticalOptions="Center">
+
+        <VerticalStackLayout Spacing="20" VerticalOptions="Center">
+
+            <Label Text="⏰ ALARM ⏰"
+                   FontSize="28"
+                   FontAttributes="Bold"
+                   TextColor="#F44336"
+                   HorizontalOptions="Center"/>
+
+            <!-- Asigură-te că aceste Label-uri au x:Name -->
+            <Label x:Name="TitleLabel"
+                   FontSize="24"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"/>
+
+            <Label x:Name="DescriptionLabel"
+                   FontSize="18"
+                   TextColor="#666666"
+                   HorizontalOptions="Center"/>
+
+            <Label x:Name="TimeLabel"
+                   FontSize="16"
+                   TextColor="#2196F3"
+                   HorizontalOptions="Center"/>
+
+            <Button Text="🔴 STOP ALARM"
+                    Clicked="OnStopClicked"
+                    BackgroundColor="#F44336"
+                    TextColor="White"
+                    FontSize="18"
+                    FontAttributes="Bold"
+                    CornerRadius="25"
+                    HeightRequest="50"
+                    WidthRequest="200"
+                    HorizontalOptions="Center"/>
+
+            <Button Text="⏰ Snooze 5 min"
+                    Clicked="OnSnoozeClicked"
+                    BackgroundColor="#FF9800"
+                    TextColor="White"
+                    FontSize="16"
+                    CornerRadius="25"
+                    HeightRequest="40"
+                    WidthRequest="200"
+                    HorizontalOptions="Center"/>
+        </VerticalStackLayout>
+    </Border>
+</ContentPage>
