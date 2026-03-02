@@ -1,7 +1,5 @@
-﻿// MainPage.xaml.cs
-using SharedActivityManager.ViewModels;
+﻿using SharedActivityManager.ViewModels;
 using SharedActivityManager.Models;
-using SharedActivityManager;
 
 namespace SharedActivityManager;
 
@@ -23,6 +21,7 @@ public partial class MainPage : ContentPage
         }
     }
 
+    // Metoda pentru deschiderea modalului de creare activitate nouă
     private async void OnModalOpen(object sender, EventArgs e)
     {
         try
@@ -32,10 +31,12 @@ public partial class MainPage : ContentPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Error", ex.Message, "OK");
+            System.Diagnostics.Debug.WriteLine($"Error opening modal: {ex.Message}");
+            await DisplayAlert("Error", $"Could not open create activity: {ex.Message}", "OK");
         }
     }
 
+    // Metoda pentru selectarea unei activități (editare)
     private async void OnActivitySelected(object sender, SelectionChangedEventArgs e)
     {
         try
@@ -44,12 +45,15 @@ public partial class MainPage : ContentPage
             {
                 var activityModal = new ActivityModal(_viewModel, selectedActivity);
                 await Navigation.PushModalAsync(activityModal);
+
+                // Deselectează
                 ((CollectionView)sender).SelectedItem = null;
             }
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Error", ex.Message, "OK");
+            System.Diagnostics.Debug.WriteLine($"Error selecting activity: {ex.Message}");
+            await DisplayAlert("Error", $"Could not open activity: {ex.Message}", "OK");
         }
     }
 }

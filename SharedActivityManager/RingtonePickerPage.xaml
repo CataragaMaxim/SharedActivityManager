@@ -2,12 +2,13 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:media="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui.MediaElement"
+             xmlns:models="clr-namespace:SharedActivityManager.Models"
              x:Class="SharedActivityManager.RingtonePickerPage"
              Title="Choose Ringtone">
 
     <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Padding="15" RowSpacing="10">
 
-        <!-- MediaElement pentru redare audio -->
+        <!-- MediaElement ascuns pentru redare audio -->
         <media:MediaElement x:Name="MediaPlayer"
                            Grid.Row="0"
                            ShouldAutoPlay="True"
@@ -42,10 +43,11 @@
         <CollectionView x:Name="RingtonesCollectionView"
                        Grid.Row="3"
                        ItemsSource="{Binding FilteredRingtones}"
-                       SelectionMode="None">
+                       SelectionMode="None"
+                       VerticalOptions="FillAndExpand">
 
             <CollectionView.ItemTemplate>
-                <DataTemplate>
+                <DataTemplate x:DataType="models:Ringtone">
                     <Border Stroke="#E0E0E0"
                             StrokeThickness="1"
                             StrokeShape="RoundRectangle 8"

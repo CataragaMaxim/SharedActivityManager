@@ -1,7 +1,6 @@
-﻿// Services/IAlarmService.cs
-using SharedActivityManager.Models;
+﻿using SharedActivityManager.Models;
 
-namespace SharedActivityManager.Services
+namespace SharedActivityManager.Abstracts.Platforms
 {
     public interface IAlarmService
     {

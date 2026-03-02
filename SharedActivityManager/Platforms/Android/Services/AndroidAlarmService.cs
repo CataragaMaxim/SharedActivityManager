@@ -1,29 +1,32 @@
-﻿using Android.App;
+﻿#if ANDROID
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Android.App;
 using Android.Content;
 using Android.Media;
 using Android.OS;
+using SharedActivityManager.Abstracts.Platforms;
 using SharedActivityManager.Models;
-using SharedActivityManager.Services;
-using AndroidApp = Android.App;
-using Application = Android.App.Application;
 using ActivityModel = SharedActivityManager.Models.Activity;
-using MauiApplication = Microsoft.Maui.Controls.Application; // Alias pentru MAUI Application
+using AndroidApp = Android.App.Application;
+using MauiApplication = Microsoft.Maui.Controls.Application;
+using Uri = Android.Net.Uri;
 
-namespace SharedActivityManager.Platforms.Android
+namespace SharedActivityManager.Services
 {
-    public class AlarmService : IAlarmService
+    public class AndroidAlarmService : IAlarmService
     {
         private const string ALARM_ACTION = "SHARED_ACTIVITY_MANAGER_ALARM";
-        private AndroidApp.AlarmManager _alarmManager;
+        private AlarmManager _alarmManager;
         private MediaPlayer _mediaPlayer;
         private bool _isAlarmPlaying;
 
-        public AlarmService()
+        public AndroidAlarmService()
         {
-            _alarmManager = (AndroidApp.AlarmManager)Application.Context.GetSystemService(Context.AlarmService);
+            _alarmManager = (AlarmManager)AndroidApp.Context.GetSystemService(Context.AlarmService);
         }
-
-        // ===== METODE PRIVATE (definite înainte de a fi folosite) =====
 
         private async Task ShowAlarmNotification(ActivityModel activity)
         {
@@ -50,8 +53,8 @@ namespace SharedActivityManager.Platforms.Android
         {
             try
             {
-                var ringtoneService = new RingtoneService();
-                await ringtoneService.PlayRingtoneAsync(ringtoneName);
+                var audioService = new AndroidAudioService();
+                await audioService.PlayRingtoneAsync(ringtoneName);
             }
             catch (Exception ex)
             {
@@ -116,8 +119,6 @@ namespace SharedActivityManager.Platforms.Android
             }
         }
 
-        // ===== METODE PUBLICE =====
-
         public async Task ScheduleAlarmAsync(ActivityModel activity)
         {
             try
@@ -131,7 +132,7 @@ namespace SharedActivityManager.Platforms.Android
                 intent.PutExtra("activity_ringtone", activity.RingTone ?? "Default Alarm");
 
                 var pendingIntent = PendingIntent.GetBroadcast(
-                    Application.Context,
+                    AndroidApp.Context,
                     activity.Id,
                     intent,
                     PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent
@@ -143,7 +144,7 @@ namespace SharedActivityManager.Platforms.Android
                 if (Build.VERSION.SdkInt >= BuildVersionCodes.M)
                 {
                     _alarmManager.SetExactAndAllowWhileIdle(
-                        AndroidApp.AlarmType.RtcWakeup,
+                        AlarmType.RtcWakeup,
                         alarmTimeMillis,
                         pendingIntent
                     );
@@ -151,7 +152,7 @@ namespace SharedActivityManager.Platforms.Android
                 else
                 {
                     _alarmManager.SetExact(
-                        AndroidApp.AlarmType.RtcWakeup,
+                        AlarmType.RtcWakeup,
                         alarmTimeMillis,
                         pendingIntent
                     );
@@ -171,7 +172,7 @@ namespace SharedActivityManager.Platforms.Android
             {
                 var intent = new Intent(ALARM_ACTION);
                 var pendingIntent = PendingIntent.GetBroadcast(
-                    Application.Context,
+                    AndroidApp.Context,
                     activityId,
                     intent,
                     PendingIntentFlags.Immutable | PendingIntentFlags.NoCreate
@@ -265,8 +266,6 @@ namespace SharedActivityManager.Platforms.Android
             }
         }
 
-        // ===== BROADCAST RECEIVER =====
-
         [BroadcastReceiver(Enabled = true, Exported = false)]
         public class AlarmReceiver : BroadcastReceiver
         {
@@ -283,7 +282,6 @@ namespace SharedActivityManager.Platforms.Android
 
                         System.Diagnostics.Debug.WriteLine($"Alarm received for: {activityTitle}");
 
-                        // Creează obiectul Activity
                         var activity = new ActivityModel
                         {
                             Id = activityId,
@@ -292,13 +290,12 @@ namespace SharedActivityManager.Platforms.Android
                             RingTone = activityRingtone
                         };
 
-                        // Rulează pe UI thread
                         var handler = new Handler(Looper.MainLooper);
                         handler.Post(() =>
                         {
                             try
                             {
-                                var alarmService = new AlarmService();
+                                var alarmService = new AndroidAlarmService();
                                 alarmService.TriggerAlarmAsync(activity).ConfigureAwait(false);
                             }
                             catch (Exception ex)
@@ -316,3 +313,4 @@ namespace SharedActivityManager.Platforms.Android
         }
     }
 }
+#endif

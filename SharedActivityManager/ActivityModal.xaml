@@ -207,39 +207,37 @@
             </Border>
 
             <!-- Butoane acțiune -->
-            <!-- Butoane acțiune -->
             <VerticalStackLayout Spacing="10" Margin="0,20,0,0">
 
                 <!-- Save Button -->
                 <Button Text="💾 Save Activity"
-                        Clicked="OnSaveActivity"
-                        BackgroundColor="#4CAF50"
-                        TextColor="White"
-                        FontSize="18"
-                        FontAttributes="Bold"
-                        CornerRadius="25"
-                        HeightRequest="55"/>
+            Clicked="OnSaveActivity"
+            BackgroundColor="#4CAF50"
+            TextColor="White"
+            FontSize="18"
+            FontAttributes="Bold"
+            CornerRadius="25"
+            HeightRequest="55"/>
 
-                <!-- Delete Button - Ar trebui să fie vizibil doar în mod editare -->
+                <!-- Delete Button - doar în mod editare -->
                 <Button Text="🗑️ Delete Activity"
-                        Clicked="OnDeleteActivity"
-                        BackgroundColor="#F44336"
-                        TextColor="White"
-                        FontSize="16"
-                        FontAttributes="Bold"
-                        CornerRadius="25"
-                        HeightRequest="50"
-                        IsVisible="{Binding IsEditMode}"/>
-                <!-- ACEASTA LINIE ESTE CRITICĂ -->
+            Clicked="OnDeleteActivity"
+            BackgroundColor="#F44336"
+            TextColor="White"
+            FontSize="16"
+            FontAttributes="Bold"
+            CornerRadius="25"
+            HeightRequest="50"
+            IsVisible="{Binding IsEditMode}"/>
 
                 <!-- Close Button -->
                 <Button Text="❌ Cancel"
-                        Clicked="OnCloseModal"
-                        BackgroundColor="#9E9E9E"
-                        TextColor="White"
-                        FontSize="16"
-                        CornerRadius="25"
-                        HeightRequest="50"/>
+            Clicked="OnCloseModal"
+            BackgroundColor="#9E9E9E"
+            TextColor="White"
+            FontSize="16"
+            CornerRadius="25"
+            HeightRequest="50"/>
             </VerticalStackLayout>
 
             <Label Text="* Required fields"

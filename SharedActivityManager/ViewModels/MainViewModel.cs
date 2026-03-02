@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SharedActivityManager.Abstracts.Platforms;
 using SharedActivityManager.Data;
 using SharedActivityManager.Enums;
 using SharedActivityManager.Models;
@@ -14,11 +15,11 @@ namespace SharedActivityManager.ViewModels
     public partial class MainViewModel : ObservableObject
     {
         private readonly ActivityDataBase _database;
-        private readonly IAlarmService _alarmService;
         private readonly IRingtoneService _ringtoneService;
+        private readonly IAlarmService _alarmService;
 
         [ObservableProperty]
-        private ObservableCollection<Activity> activities;
+        private ObservableCollection<Activity> activities = new();
 
         [ObservableProperty]
         private string newTaskTitle;
@@ -42,7 +43,7 @@ namespace SharedActivityManager.ViewModels
         private ReminderType selectedReminderType = ReminderType.None;
 
         [ObservableProperty]
-        private string selectedRingTone = "Default";
+        private string selectedRingTone = "Default Alarm";
 
         [ObservableProperty]
         private Ringtone selectedRingtoneObject;
@@ -59,10 +60,8 @@ namespace SharedActivityManager.ViewModels
         [ObservableProperty]
         private Activity selectedActivity;
 
-        // Proprietate pentru data și ora combinată
         public DateTime CombinedStartDateTime => SelectedStartDate.Add(SelectedStartTime);
 
-        // Liste pentru pickere
         public ObservableCollection<ActivityType> ActivityTypeList { get; } =
             new ObservableCollection<ActivityType>(Enum.GetValues<ActivityType>());
 
@@ -72,35 +71,40 @@ namespace SharedActivityManager.ViewModels
         public ObservableCollection<string> RingToneList { get; } =
             new ObservableCollection<string>
             {
-                "Default",
-                "Morning Alarm",
-                "Digital Buzz",
-                "Gentle Reminder",
-                "Urgent",
-                "Silent"
+                "Default Alarm",
+                "Digital Beep",
+                "Gentle Wake",
+                "Morning Bliss",
+                "Classic Ring"
             };
 
-        // Constructor
         public MainViewModel()
         {
             _database = new ActivityDataBase();
             _ringtoneService = new RingtoneService();
-            _alarmService = new PlatformAlarmService();
+            _alarmService = new AlarmService();
 
             activities = new ObservableCollection<Activity>();
-            LoadActivities();
 
-            LoadSavedRingtone();
-            UpdateNextReminderPreview();
+            // Apelează LoadActivities și așteaptă să se termine
+            Task.Run(async () => await LoadActivities()).Wait();
+
+            // Sau mai bine, fă-o async în constructorul static
+            LoadActivities().ContinueWith(t =>
+            {
+                if (t.IsFaulted)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading activities: {t.Exception}");
+                }
+            });
         }
 
-
-        private async void ScheduleExistingAlarms()
+        // Restaurează alarmele la pornire
+        private async Task RestoreAlarmsAsync()
         {
             try
             {
-                var alarmService = new PlatformAlarmService();
-                await alarmService.RestoreAlarmsAsync(Activities.ToList());
+                await _alarmService.RestoreAlarmsAsync(Activities.ToList());
             }
             catch (Exception ex)
             {
@@ -127,15 +131,15 @@ namespace SharedActivityManager.ViewModels
 
         // Încărcare activități
         [RelayCommand]
-        public async Task LoadActivities()
+        private async Task LoadActivities()
         {
-            var activities = await _database.GetActivitiesAsync();
-            Activities = new ObservableCollection<Activity>(activities.OrderBy(a => a.StartDate));
+            var activitiesFromDb = await _database.GetActivitiesAsync();
+            Activities = new ObservableCollection<Activity>(activitiesFromDb.OrderBy(a => a.StartDate));
         }
 
         // Adăugare activitate nouă
         [RelayCommand]
-        private async void AddActivity()
+        private async Task AddActivity()
         {
             if (string.IsNullOrWhiteSpace(NewTaskTitle))
             {
@@ -161,6 +165,13 @@ namespace SharedActivityManager.ViewModels
                 };
 
                 await _database.SaveActivityAsync(newActivity);
+
+                // Programează alarmă dacă e setată
+                if (newActivity.AlarmSet)
+                {
+                    await _alarmService.ScheduleAlarmAsync(newActivity);
+                }
+
                 Activities.Add(newActivity);
 
                 // Sortare după dată
@@ -180,8 +191,6 @@ namespace SharedActivityManager.ViewModels
             }
         }
 
-        // ===== METODE NOI ADĂUGATE =====
-
         // Salvare activitate editată
         public async Task SaveEditedActivity()
         {
@@ -196,6 +205,9 @@ namespace SharedActivityManager.ViewModels
 
             try
             {
+                // Anulează alarma veche
+                await _alarmService.CancelAlarmAsync(SelectedActivity.Id);
+
                 SelectedActivity.Title = NewTaskTitle;
                 SelectedActivity.Desc = NewTaskDesc ?? string.Empty;
                 SelectedActivity.TypeId = SelectedActivityType;
@@ -207,6 +219,12 @@ namespace SharedActivityManager.ViewModels
                 SelectedActivity.RingTone = SelectedRingTone ?? "Default";
 
                 await _database.SaveActivityAsync(SelectedActivity);
+
+                // Programează alarmă nouă dacă e setată
+                if (SelectedActivity.AlarmSet && !SelectedActivity.isCompleted)
+                {
+                    await _alarmService.ScheduleAlarmAsync(SelectedActivity);
+                }
 
                 // Reîncărcăm lista
                 await LoadActivitiesAsync();
@@ -221,7 +239,7 @@ namespace SharedActivityManager.ViewModels
             }
         }
 
-        // Adăugare activitate nouă (versiunea Task pentru a putea fi așteptată)
+        // Adăugare activitate nouă (versiunea Task)
         public async Task AddNewActivity()
         {
             if (string.IsNullOrWhiteSpace(NewTaskTitle))
@@ -282,8 +300,6 @@ namespace SharedActivityManager.ViewModels
                     $"Failed to load activities: {ex.Message}", "OK");
             }
         }
-
-        // ===== METODE EXISTENTE =====
 
         // Ștergere activitate
         [RelayCommand]
@@ -381,7 +397,6 @@ namespace SharedActivityManager.ViewModels
             SelectedRingtoneObject = null;
 
             UpdateNextReminderPreview();
-
         }
 
         // Calculare dată următor reminder
@@ -458,5 +473,12 @@ namespace SharedActivityManager.ViewModels
         {
             OnPropertyChanged(nameof(IsEditMode));
         }
+
+        // Elimină sau comentează metoda OnAlarmTriggered care folosește servicii inexistente
+        // private async void OnAlarmTriggered(Activity activity)
+        // {
+        //     await _notificationService.ShowAlarmNotificationAsync(activity);
+        //     await _audioService.PlayRingtoneAsync(activity.RingTone);
+        // }
     }
 }

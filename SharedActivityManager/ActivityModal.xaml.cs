@@ -1,6 +1,5 @@
 ﻿using SharedActivityManager.ViewModels;
 using SharedActivityManager.Models;
-using SharedActivityManager.Enums;
 
 namespace SharedActivityManager;
 
@@ -8,41 +7,45 @@ public partial class ActivityModal : ContentPage
 {
     private MainViewModel _viewModel;
     private Activity _activityToEdit;
-    private bool _isEditMode;
 
     // Constructor pentru activitate NOUĂ
     public ActivityModal(MainViewModel viewModel)
     {
-        InitializeComponent();
-        _viewModel = viewModel;
-        _activityToEdit = null;
-        _isEditMode = false;
+        try
+        {
+            InitializeComponent();
+            _viewModel = viewModel;
+            _activityToEdit = null;
 
-        BindingContext = _viewModel;
+            BindingContext = _viewModel;
 
-        _viewModel.IsEditMode = false;
-        _viewModel.PageTitle = "Create New Activity";
-
-        Title = "Create New Activity";
-        _viewModel.ResetForm();
+            Title = "Create New Activity";
+            _viewModel.ResetForm();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error in ActivityModal constructor (new): {ex.Message}");
+        }
     }
 
     // Constructor pentru EDITARE activitate
     public ActivityModal(MainViewModel viewModel, Activity activityToEdit)
     {
-        InitializeComponent();
-        _viewModel = viewModel;
-        _activityToEdit = activityToEdit;
-        _isEditMode = true;
+        try
+        {
+            InitializeComponent();
+            _viewModel = viewModel;
+            _activityToEdit = activityToEdit;
 
-        BindingContext = _viewModel;
+            BindingContext = _viewModel;
 
-        _viewModel.IsEditMode = true;
-        _viewModel.PageTitle = "Edit Activity";
-        _viewModel.SelectedActivity = activityToEdit;
-
-        Title = "Edit Activity";
-        LoadActivityData();
+            Title = "Edit Activity";
+            LoadActivityData();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error in ActivityModal constructor (edit): {ex.Message}");
+        }
     }
 
     private void LoadActivityData()
@@ -59,86 +62,32 @@ public partial class ActivityModal : ContentPage
         _viewModel.SelectedRingTone = _activityToEdit.RingTone ?? "Default Alarm";
     }
 
+    // ===== METODE PENTRU BUTOANE =====
+
+    // Închidere modal
+    private async void OnCloseModal(object sender, EventArgs e)
+    {
+        await Navigation.PopModalAsync();
+    }
+
     // Salvare activitate
     private async void OnSaveActivity(object sender, EventArgs e)
     {
-        if (_isEditMode)
-        {
-            await EditActivity();
-        }
-        else
-        {
-            await AddNewActivity();
-        }
-    }
-
-    // Editare activitate existentă - FĂRĂ PARAMETRU
-    private async Task EditActivity()
-    {
-        if (_activityToEdit == null) return;
-
-        if (string.IsNullOrWhiteSpace(_viewModel.NewTaskTitle))
-        {
-            await DisplayAlert("Validation", "Title is required", "OK");
-            return;
-        }
-
         try
         {
-            // Folosește _viewModel pentru toate proprietățile
-            _activityToEdit.Title = _viewModel.NewTaskTitle;
-            _activityToEdit.Desc = _viewModel.NewTaskDesc ?? string.Empty;
-            _activityToEdit.TypeId = _viewModel.SelectedActivityType;
-            _activityToEdit.StartDate = _viewModel.SelectedStartDate;
-            _activityToEdit.StartTime = _viewModel.SelectedStartDate.Add(_viewModel.SelectedStartTime);
-            _activityToEdit.AlarmSet = _viewModel.AlarmSet;
-            _activityToEdit.ReminderTypeId = _viewModel.SelectedReminderType;
-            _activityToEdit.RingTone = _viewModel.SelectedRingTone ?? "Default Alarm";
-
-            // Salvează în baza de date prin ViewModel
-            await _viewModel.SaveActivityToDatabase(_activityToEdit);
-
-            await DisplayAlert("Success", "Activity updated successfully!", "OK");
-            await Navigation.PopModalAsync();
-        }
-        catch (Exception ex)
-        {
-            await DisplayAlert("Error", $"Failed to update activity: {ex.Message}", "OK");
-        }
-    }
-
-    // Adăugare activitate nouă
-    private async Task AddNewActivity()
-    {
-        if (string.IsNullOrWhiteSpace(_viewModel.NewTaskTitle))
-        {
-            await DisplayAlert("Validation", "Title is required", "OK");
-            return;
-        }
-
-        try
-        {
-            var newActivity = new Activity
+            if (_activityToEdit != null)
             {
-                Title = _viewModel.NewTaskTitle,
-                Desc = _viewModel.NewTaskDesc ?? string.Empty,
-                TypeId = _viewModel.SelectedActivityType,
-                StartDate = _viewModel.SelectedStartDate,
-                StartTime = _viewModel.SelectedStartDate.Add(_viewModel.SelectedStartTime),
-                AlarmSet = _viewModel.AlarmSet,
-                isCompleted = false,
-                ReminderTypeId = _viewModel.SelectedReminderType,
-                RingTone = _viewModel.SelectedRingTone ?? "Default Alarm"
-            };
-
-            await _viewModel.AddActivityToDatabase(newActivity);
-
-            await DisplayAlert("Success", "Activity added successfully!", "OK");
+                await _viewModel.SaveEditedActivity();
+            }
+            else
+            {
+                await _viewModel.AddNewActivity();
+            }
             await Navigation.PopModalAsync();
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Error", $"Failed to add activity: {ex.Message}", "OK");
+            await DisplayAlert("Error", $"Failed to save: {ex.Message}", "OK");
         }
     }
 
@@ -159,7 +108,7 @@ public partial class ActivityModal : ContentPage
         }
     }
 
-    // Alege ringtone
+    // ===== METODA PENTRU RINGTONE PICKER (ASTA LIPSEA) =====
     private async void OnChooseRingtoneClicked(object sender, EventArgs e)
     {
         try
@@ -182,18 +131,5 @@ public partial class ActivityModal : ContentPage
         {
             await DisplayAlert("Error", $"Failed to open ringtone picker: {ex.Message}", "OK");
         }
-    }
-
-    // Închidere modal
-    private async void OnCloseModal(object sender, EventArgs e)
-    {
-        await Navigation.PopModalAsync();
-    }
-
-    protected override void OnDisappearing()
-    {
-        base.OnDisappearing();
-        _viewModel.IsEditMode = false;
-        _viewModel.SelectedActivity = null;
     }
 }
