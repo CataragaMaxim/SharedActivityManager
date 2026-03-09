@@ -10,18 +10,44 @@ using SharedActivityManager.Abstracts.Platforms;
 using SharedActivityManager.Models;
 using AndroidApp = Android.App.Application;
 using AndroidUri = Android.Net.Uri;
-using RingtoneModel = SharedActivityManager.Models.Ringtone;
 
-namespace SharedActivityManager.Services
+namespace SharedActivityManager.Platforms.Android.Services
 {
     public class AndroidAudioService : IAudioService
     {
         private MediaPlayer _mediaPlayer;
         public bool IsPlaying { get; private set; }
 
-        public async Task<List<RingtoneModel>> GetAvailableRingtonesAsync()
+        // Obține toate tonurile disponibile (sistem + aplicație)
+        public async Task<List<RingtoneProj>> GetAvailableRingtonesAsync()
         {
-            var ringtones = new List<RingtoneModel>();
+            var ringtones = new List<RingtoneProj>();
+
+            try
+            {
+                // 1. Tonuri de sistem (folosind RingtoneManager)
+                var systemRingtones = await GetSystemRingtonesAsync();
+                ringtones.AddRange(systemRingtones);
+
+                // 2. Tonuri default ale aplicației (cele hardcodate)
+                var defaultAppRingtones = GetDefaultAppRingtones();
+                ringtones.AddRange(defaultAppRingtones);
+
+                // 3. Tonuri din folderul aplicației (importate de utilizator)
+                var importedRingtones = await GetImportedRingtonesAsync();
+                ringtones.AddRange(importedRingtones);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"AndroidAudioService: Error loading ringtones: {ex.Message}");
+            }
+
+            return ringtones;
+        }
+
+        private async Task<List<RingtoneProj>> GetSystemRingtonesAsync()
+        {
+            var ringtones = new List<RingtoneProj>();
 
             try
             {
@@ -37,76 +63,307 @@ namespace SharedActivityManager.Services
                     var title = cursor.GetString(titleColumnIndex);
                     var data = cursor.GetString(dataColumnIndex);
 
-                    ringtones.Add(new RingtoneModel
+                    ringtones.Add(new RingtoneProj
                     {
                         Id = data,
                         Title = title,
                         FileName = Path.GetFileName(data),
                         FilePath = data,
-                        IsSystem = true
+                        IsSystem = true,
                     });
                 }
                 cursor.Close();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading ringtones: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"AndroidAudioService: Error loading system ringtones: {ex.Message}");
             }
 
-            return await Task.FromResult(ringtones);
+            return ringtones;
+        }
+
+        private List<RingtoneProj> GetDefaultAppRingtones()
+        {
+            var ringtones = new List<RingtoneProj>
+            {
+                new RingtoneProj {
+                    Id = "default1",
+                    Title = "Default Alarm",
+                    FileName = "default_alarm.mp3",
+                    IsSystem = false
+                },
+                new RingtoneProj {
+                    Id = "default2",
+                    Title = "Digital Beep",
+                    FileName = "digital_beep.mp3",
+                    IsSystem = false
+                },
+                new RingtoneProj {
+                    Id = "default3",
+                    Title = "Gentle Wake",
+                    FileName = "gentle_wake.mp3",
+                    IsSystem = false
+                }
+            };
+
+            // Asigură-te că fișierele default există
+            Task.Run(async () => await EnsureDefaultRingtonesExist());
+
+            return ringtones;
+        }
+
+        private async Task<List<RingtoneProj>> GetImportedRingtonesAsync()
+        {
+            var ringtones = new List<RingtoneProj>();
+
+            try
+            {
+                var folder = Path.Combine(FileSystem.AppDataDirectory, "Ringtones");
+                if (Directory.Exists(folder))
+                {
+                    foreach (var file in Directory.GetFiles(folder, "*.mp3"))
+                    {
+                        // Ignoră fișierele default (ca să nu apară dublat)
+                        string fileName = Path.GetFileName(file);
+                        if (fileName == "default_alarm.mp3" ||
+                            fileName == "digital_beep.mp3" ||
+                            fileName == "gentle_wake.mp3")
+                        {
+                            continue;
+                        }
+
+                        ringtones.Add(new RingtoneProj
+                        {
+                            Id = Path.GetFileName(file),
+                            Title = Path.GetFileNameWithoutExtension(file),
+                            FileName = Path.GetFileName(file),
+                            FilePath = file,
+                            IsSystem = false
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"AndroidAudioService: Error loading imported ringtones: {ex.Message}");
+            }
+
+            return ringtones;
         }
 
         public async Task<bool> PlayRingtoneAsync(string ringtoneIdentifier)
         {
             try
             {
+                System.Diagnostics.Debug.WriteLine($"AndroidAudioService: Attempting to play: {ringtoneIdentifier}");
+
                 await StopPlayingAsync();
 
-                if (ringtoneIdentifier != null && (ringtoneIdentifier.StartsWith("content://") || ringtoneIdentifier.StartsWith("file://")))
+                string filePath = null;
+
+                // 1. Verifică dacă e un ID default (default1, default2, default3)
+                if (ringtoneIdentifier.StartsWith("default") ||
+                    (ringtoneIdentifier.Length == 1 && char.IsDigit(ringtoneIdentifier[0])))
                 {
-                    _mediaPlayer = MediaPlayer.Create(AndroidApp.Context, AndroidUri.Parse(ringtoneIdentifier));
+                    filePath = await GetDefaultRingtonePath(ringtoneIdentifier);
+                }
+                // 2. Verifică dacă e o cale completă (content:// sau file://)
+                else if (ringtoneIdentifier.StartsWith("content://") || ringtoneIdentifier.StartsWith("file://"))
+                {
+                    // Pentru tonuri de sistem, putem folosi direct RingtoneManager
+                    try
+                    {
+                        var ringtone = RingtoneManager.GetRingtone(AndroidApp.Context, AndroidUri.Parse(ringtoneIdentifier));
+                        if (ringtone != null)
+                        {
+                            ringtone.Play();
+                            IsPlaying = true;
+                            return true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"AndroidAudioService: Error playing system ringtone: {ex.Message}");
+                    }
                 }
                 else
                 {
-                    var filePath = Path.Combine(FileSystem.AppDataDirectory, "Ringtones", ringtoneIdentifier);
-                    if (File.Exists(filePath))
-                    {
-                        _mediaPlayer = new MediaPlayer();
-                        _mediaPlayer.SetDataSource(filePath);
-                        _mediaPlayer.Prepare();
-                    }
+                    // 3. Caută în folderul aplicației
+                    filePath = await FindRingtoneFile(ringtoneIdentifier);
                 }
 
-                if (_mediaPlayer != null)
+                // Redă folosind MediaPlayer dacă avem o cale validă
+                if (filePath != null && File.Exists(filePath))
                 {
+                    System.Diagnostics.Debug.WriteLine($"Playing file: {filePath}");
+                    _mediaPlayer = new MediaPlayer();
+                    await _mediaPlayer.SetDataSourceAsync(filePath);
+                    _mediaPlayer.Prepare();
                     _mediaPlayer.Start();
+                    _mediaPlayer.Looping = true;
                     IsPlaying = true;
                     return true;
                 }
 
+                System.Diagnostics.Debug.WriteLine($"File not found for identifier: {ringtoneIdentifier}");
                 return false;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error playing: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"AndroidAudioService: Error playing: {ex.Message}");
                 return false;
+            }
+        }
+
+        private async Task<string> FindRingtoneFile(string identifier)
+        {
+            // Calea completă posibilă
+            var possiblePath = Path.Combine(FileSystem.AppDataDirectory, "Ringtones", identifier);
+            if (File.Exists(possiblePath))
+            {
+                return possiblePath;
+            }
+
+            // Caută în folderul de ringtones
+            var ringtonesFolder = Path.Combine(FileSystem.AppDataDirectory, "Ringtones");
+            if (Directory.Exists(ringtonesFolder))
+            {
+                var files = Directory.GetFiles(ringtonesFolder, "*.mp3");
+
+                // Încearcă să găsească după numele fișierului (fără extensie)
+                string fileNameWithoutExt = Path.GetFileNameWithoutExtension(identifier);
+
+                foreach (var file in files)
+                {
+                    string currentFileName = Path.GetFileName(file);
+                    string currentFileNameWithoutExt = Path.GetFileNameWithoutExtension(file);
+
+                    // Verifică diferite potriviri
+                    if (currentFileName.Equals(identifier, StringComparison.OrdinalIgnoreCase) ||
+                        currentFileNameWithoutExt.Equals(identifier, StringComparison.OrdinalIgnoreCase) ||
+                        currentFileName.Contains(identifier, StringComparison.OrdinalIgnoreCase) ||
+                        currentFileNameWithoutExt.Contains(fileNameWithoutExt, StringComparison.OrdinalIgnoreCase) ||
+                        identifier.Contains(currentFileNameWithoutExt, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return file;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private async Task<string> GetDefaultRingtonePath(string ringtoneId)
+        {
+            try
+            {
+                string fileName;
+                switch (ringtoneId)
+                {
+                    case "default1":
+                        fileName = "default_alarm.mp3";
+                        break;
+                    case "default2":
+                        fileName = "digital_beep.mp3";
+                        break;
+                    case "default3":
+                        fileName = "gentle_wake.mp3";
+                        break;
+                    default:
+                        fileName = "default_alarm.mp3";
+                        break;
+                }
+
+                var destinationPath = Path.Combine(FileSystem.AppDataDirectory, "Ringtones", fileName);
+
+                // Verifică dacă fișierul există deja
+                if (File.Exists(destinationPath))
+                {
+                    return destinationPath;
+                }
+
+                // Dacă nu există, încearcă să-l extragă din resurse
+                await ExtractDefaultRingtone(fileName, destinationPath);
+
+                return File.Exists(destinationPath) ? destinationPath : null;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"AndroidAudioService: Error getting default ringtone: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task ExtractDefaultRingtone(string fileName, string destinationPath)
+        {
+            try
+            {
+                var folder = Path.Combine(FileSystem.AppDataDirectory, "Ringtones");
+                if (!Directory.Exists(folder))
+                {
+                    Directory.CreateDirectory(folder);
+                }
+
+                // Încearcă să extragă din resursele aplicației
+                using var stream = await FileSystem.OpenAppPackageFileAsync(fileName);
+                using var fileStream = File.Create(destinationPath);
+                await stream.CopyToAsync(fileStream);
+                System.Diagnostics.Debug.WriteLine($"Extracted {fileName} to {destinationPath}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to extract {fileName}: {ex.Message}");
+            }
+        }
+
+        private async Task EnsureDefaultRingtonesExist()
+        {
+            var ringtonesFolder = Path.Combine(FileSystem.AppDataDirectory, "Ringtones");
+            if (!Directory.Exists(ringtonesFolder))
+            {
+                Directory.CreateDirectory(ringtonesFolder);
+            }
+
+            var defaultFiles = new[] { "default_alarm.mp3", "digital_beep.mp3", "gentle_wake.mp3" };
+
+            foreach (var file in defaultFiles)
+            {
+                var destPath = Path.Combine(ringtonesFolder, file);
+                if (!File.Exists(destPath))
+                {
+                    await ExtractDefaultRingtone(file, destPath);
+                }
             }
         }
 
         public async Task StopPlayingAsync()
         {
-            _mediaPlayer?.Stop();
-            _mediaPlayer?.Release();
-            _mediaPlayer = null;
-            IsPlaying = false;
+            try
+            {
+                _mediaPlayer?.Stop();
+                _mediaPlayer?.Release();
+                _mediaPlayer = null;
+                IsPlaying = false;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"AndroidAudioService: Error stopping: {ex.Message}");
+            }
             await Task.CompletedTask;
         }
 
         public async Task SetVolumeAsync(float volume)
         {
-            if (_mediaPlayer != null)
+            try
             {
-                _mediaPlayer.SetVolume(volume, volume);
+                if (_mediaPlayer != null)
+                {
+                    _mediaPlayer.SetVolume(volume, volume);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"AndroidAudioService: Error setting volume: {ex.Message}");
             }
             await Task.CompletedTask;
         }
@@ -116,19 +373,20 @@ namespace SharedActivityManager.Services
             try
             {
                 var fileName = Path.GetFileName(filePath);
-                var destinationPath = Path.Combine(FileSystem.AppDataDirectory, "Ringtones", fileName);
+                var destPath = Path.Combine(FileSystem.AppDataDirectory, "Ringtones", fileName);
 
                 if (!Directory.Exists(Path.Combine(FileSystem.AppDataDirectory, "Ringtones")))
                 {
                     Directory.CreateDirectory(Path.Combine(FileSystem.AppDataDirectory, "Ringtones"));
                 }
 
-                File.Copy(filePath, destinationPath, true);
+                File.Copy(filePath, destPath, true);
+                System.Diagnostics.Debug.WriteLine($"AndroidAudioService: Imported {fileName}");
                 return true;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error importing: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"AndroidAudioService: Error importing: {ex.Message}");
                 return false;
             }
         }

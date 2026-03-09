@@ -9,7 +9,7 @@ namespace SharedActivityManager.Abstracts.Platforms
 {
     public interface IAudioService
     {
-        Task<List<Ringtone>> GetAvailableRingtonesAsync();
+        Task<List<RingtoneProj>> GetAvailableRingtonesAsync();
         Task<bool> PlayRingtoneAsync(string ringtoneIdentifier);
         Task StopPlayingAsync();
         Task SetVolumeAsync(float volume);

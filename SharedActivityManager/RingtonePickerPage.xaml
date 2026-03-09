@@ -47,7 +47,7 @@
                        VerticalOptions="FillAndExpand">
 
             <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="models:Ringtone">
+                <DataTemplate x:DataType="models:RingtoneProj">
                     <Border Stroke="#E0E0E0"
                             StrokeThickness="1"
                             StrokeShape="RoundRectangle 8"

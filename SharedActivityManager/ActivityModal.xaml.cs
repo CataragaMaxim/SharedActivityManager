@@ -11,21 +11,18 @@ public partial class ActivityModal : ContentPage
     // Constructor pentru activitate NOUĂ
     public ActivityModal(MainViewModel viewModel)
     {
-        try
-        {
-            InitializeComponent();
-            _viewModel = viewModel;
-            _activityToEdit = null;
+        InitializeComponent();
+        _viewModel = viewModel;
+        _activityToEdit = null;
 
-            BindingContext = _viewModel;
+        BindingContext = _viewModel;
 
-            Title = "Create New Activity";
-            _viewModel.ResetForm();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error in ActivityModal constructor (new): {ex.Message}");
-        }
+        // IMPORTANT: Setează IsEditMode = false
+        _viewModel.IsEditMode = false;
+        _viewModel.PageTitle = "Create New Activity";
+
+        Title = "Create New Activity";
+        _viewModel.ResetForm();
     }
 
     // Constructor pentru EDITARE activitate
@@ -38,6 +35,11 @@ public partial class ActivityModal : ContentPage
             _activityToEdit = activityToEdit;
 
             BindingContext = _viewModel;
+
+            // IMPORTANT: Setează IsEditMode = TRUE pentru editare
+            _viewModel.IsEditMode = true;  // ← Asigură-te că asta e aici
+            _viewModel.PageTitle = "Edit Activity";
+            _viewModel.SelectedActivity = activityToEdit;
 
             Title = "Edit Activity";
             LoadActivityData();
@@ -73,8 +75,10 @@ public partial class ActivityModal : ContentPage
     // Salvare activitate
     private async void OnSaveActivity(object sender, EventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"OnSaveActivity - IsEditMode: {_viewModel.IsEditMode}");
+        System.Diagnostics.Debug.WriteLine($"OnSaveActivity - _activityToEdit: {_activityToEdit?.Id}");
         try
-        {
+        {   
             if (_activityToEdit != null)
             {
                 await _viewModel.SaveEditedActivity();
@@ -87,6 +91,7 @@ public partial class ActivityModal : ContentPage
         }
         catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"Error saving: {ex.Message}");
             await DisplayAlert("Error", $"Failed to save: {ex.Message}", "OK");
         }
     }

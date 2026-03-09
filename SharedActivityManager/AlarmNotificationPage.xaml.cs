@@ -1,30 +1,35 @@
-﻿using SharedActivityManager.Services;
-using Microsoft.Maui.Controls;
+﻿using SharedActivityManager.Abstracts.Platforms;
+using SharedActivityManager.Services;
 
 namespace SharedActivityManager;
 
 public partial class AlarmNotificationPage : ContentPage
 {
     private string _ringtone;
-    private IRingtoneService _ringtoneService;
+    private IAudioService _audioService;
+    private IAlarmService _alarmService; // ← Adaugă pentru a opri alarma
 
     public AlarmNotificationPage(string title, string description, string ringtone = "Default")
     {
         InitializeComponent();
         _ringtone = ringtone;
-        _ringtoneService = new RingtoneService();
+        _audioService = PlatformServiceLocator.AudioService;
+        _alarmService = PlatformServiceLocator.AlarmService;
 
         TitleLabel.Text = title;
         DescriptionLabel.Text = description ?? "Time for your activity!";
+        TimeLabel.Text = DateTime.Now.ToString("HH:mm:ss");
 
-        PlayAlarmSound();
+        // Rulează sunetul după ce pagina este încărcată
+        this.Loaded += async (s, e) => await PlayAlarmSound();
     }
 
-    private async void PlayAlarmSound()
+    private async Task PlayAlarmSound()
     {
         try
         {
-            await _ringtoneService.PlayRingtoneAsync(_ringtone);
+            System.Diagnostics.Debug.WriteLine($"AlarmNotificationPage: Playing sound {_ringtone}");
+            await _audioService.PlayRingtoneAsync(_ringtone);
         }
         catch (Exception ex)
         {
@@ -32,11 +37,17 @@ public partial class AlarmNotificationPage : ContentPage
         }
     }
 
+    // 🔥 MODIFICAT: Acum oprește și alarma, nu doar sunetul
     private async void OnStopClicked(object sender, EventArgs e)
     {
         try
         {
-            await _ringtoneService.StopPlayingAsync();
+            System.Diagnostics.Debug.WriteLine("AlarmNotificationPage: Stopping alarm");
+
+            // Folosește PlatformServiceLocator pentru a obține serviciul corect
+            var alarmService = PlatformServiceLocator.AlarmService;
+            await alarmService.StopCurrentAlarmAsync();
+
             await Navigation.PopModalAsync();
         }
         catch (Exception ex)
@@ -50,12 +61,18 @@ public partial class AlarmNotificationPage : ContentPage
     {
         try
         {
-            await _ringtoneService.StopPlayingAsync();
-            await DisplayAlert("Snooze", "Snooze for 5 minutes", "OK");
-            await Navigation.PopModalAsync();
+            System.Diagnostics.Debug.WriteLine("AlarmNotificationPage: Snoozing alarm");
+
+            // Oprește sunetul
+            await _audioService.StopPlayingAsync();
 
             // Aici poți implementa logica de snooze
-            // De exemplu, programează o nouă alarmă peste 5 minute
+            // De exemplu, reprogramează alarma peste 5 minute
+            await Task.Delay(300000); // 5 minute în milisecunde
+
+            await DisplayAlert("Snooze", "Snooze time is over!", "OK");
+
+            await Navigation.PopModalAsync();
         }
         catch (Exception ex)
         {
@@ -64,5 +81,22 @@ public partial class AlarmNotificationPage : ContentPage
         }
     }
 
+    // 🔥 Asigură-te că sunetul se oprește când pagina este închisă
+    protected override async void OnDisappearing()
+    {
+        base.OnDisappearing();
 
+        try
+        {
+            // Oprește sunetul când pagina este închisă
+            if (_audioService.IsPlaying)
+            {
+                await _audioService.StopPlayingAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error stopping sound on disappearing: {ex.Message}");
+        }
+    }
 }

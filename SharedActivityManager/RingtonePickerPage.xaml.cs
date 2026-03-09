@@ -1,8 +1,9 @@
-﻿using CommunityToolkit.Maui.Views; // Pentru MediaElement
-using Microsoft.Maui.Controls;     // Pentru ContentPage
-using Microsoft.Maui.Storage;       // Pentru FileSystem
+﻿using CommunityToolkit.Maui.Views;
+using Microsoft.Maui.Controls;
+using Microsoft.Maui.Storage;
 using SharedActivityManager.Models;
-using SharedActivityManager.Services;
+using SharedActivityManager.Abstracts.Platforms; // ← Adaugă asta
+using SharedActivityManager.Services; // ← PlatformServiceLocator
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -11,14 +12,14 @@ namespace SharedActivityManager;
 
 public partial class RingtonePickerPage : ContentPage, INotifyPropertyChanged
 {
-    private IRingtoneService _ringtoneService;
-    private List<Ringtone> _allRingtones;
-    private ObservableCollection<Ringtone> _filteredRingtones;
-    private Ringtone _selectedRingtone;
+    private IAudioService _audioService; // ← Schimbat din IRingtoneService în IAudioService
+    private List<RingtoneProj> _allRingtones;
+    private ObservableCollection<RingtoneProj> _filteredRingtones;
+    private RingtoneProj _selectedRingtone;
     private bool _isPlaying;
-    private Action<Ringtone> _callback;
+    private Action<RingtoneProj> _callback;
 
-    public ObservableCollection<Ringtone> FilteredRingtones
+    public ObservableCollection<RingtoneProj> FilteredRingtones
     {
         get => _filteredRingtones;
         set
@@ -42,11 +43,11 @@ public partial class RingtonePickerPage : ContentPage, INotifyPropertyChanged
     {
         try
         {
-            InitializeComponent(); // Acum ar trebui să funcționeze
+            InitializeComponent();
 
-            _ringtoneService = new RingtoneService();
-            _allRingtones = new List<Ringtone>();
-            _filteredRingtones = new ObservableCollection<Ringtone>();
+            _audioService = PlatformServiceLocator.AudioService; // ← Folosește PlatformServiceLocator
+            _allRingtones = new List<RingtoneProj>();
+            _filteredRingtones = new ObservableCollection<RingtoneProj>();
 
             LoadRingtones();
             BindingContext = this;
@@ -57,14 +58,15 @@ public partial class RingtonePickerPage : ContentPage, INotifyPropertyChanged
         }
     }
 
-    public void SetRingtoneSelectedCallback(Action<Ringtone> callback)
+    public void SetRingtoneSelectedCallback(Action<RingtoneProj> callback)
     {
         _callback = callback;
     }
 
-    private void LoadRingtones()
+    private async void LoadRingtones() // ← Schimbat în async void
     {
-        _allRingtones = _ringtoneService.GetAvailableRingtones();
+        var ringtones = await _audioService.GetAvailableRingtonesAsync(); // ← Folosește _audioService
+        _allRingtones = ringtones.ToList();
         FilterRingtones(string.Empty);
     }
 
@@ -90,42 +92,59 @@ public partial class RingtonePickerPage : ContentPage, INotifyPropertyChanged
     private async void OnPlayRingtoneClicked(object sender, EventArgs e)
     {
         var button = sender as Button;
-        var ringtone = button?.CommandParameter as Ringtone;
+        var ringtone = button?.CommandParameter as RingtoneProj;
 
         if (ringtone != null)
         {
             try
             {
+                System.Diagnostics.Debug.WriteLine($"RingtonePicker: Playing ringtone - Title: {ringtone.Title}, FileName: {ringtone.FileName}, DisplayName: {ringtone.DisplayName}");
+
                 // Oprește redarea curentă
-                MediaPlayer.Stop();
+                await _audioService.StopPlayingAsync();
 
-                // Setează sursa audio
-                var filePath = Path.Combine(FileSystem.AppDataDirectory, "Ringtones", ringtone.FileName);
+                // 🔥 FIX: Folosește Title sau FileName, nu DisplayName
+                // Title nu conține emoji-ul, FileName conține numele real al fișierului
+                string identifierToUse = ringtone.FileName;
 
-                if (File.Exists(filePath))
+                // Dacă FileName este gol, încearcă Title
+                if (string.IsNullOrEmpty(identifierToUse))
                 {
-                    MediaPlayer.Source = MediaSource.FromFile(filePath);
-                    MediaPlayer.Play();
+                    identifierToUse = ringtone.Title;
+                }
+
+                // Dacă nici Title nu e disponibil, folosește Id
+                if (string.IsNullOrEmpty(identifierToUse))
+                {
+                    identifierToUse = ringtone.Id;
+                }
+
+                System.Diagnostics.Debug.WriteLine($"RingtonePicker: Using identifier: {identifierToUse}");
+
+                var success = await _audioService.PlayRingtoneAsync(identifierToUse);
+
+                if (success)
+                {
                     IsPlaying = true;
                     _selectedRingtone = ringtone;
-
                     await DisplayAlert("Playing", $"Now playing: {ringtone.Title}", "OK");
                 }
                 else
                 {
-                    await DisplayAlert("Error", $"File not found: {ringtone.FileName}", "OK");
+                    await DisplayAlert("Error", $"Could not play: {ringtone.Title}", "OK");
                 }
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"RingtonePicker: Error playing: {ex.Message}");
                 await DisplayAlert("Error", $"Failed to play: {ex.Message}", "OK");
             }
         }
     }
 
-    private void OnStopRingtoneClicked(object sender, EventArgs e)
+    private async void OnStopRingtoneClicked(object sender, EventArgs e)
     {
-        MediaPlayer.Stop();
+        await _audioService.StopPlayingAsync(); // ← Folosește IAudioService
         IsPlaying = false;
     }
 
@@ -133,7 +152,8 @@ public partial class RingtonePickerPage : ContentPage, INotifyPropertyChanged
     {
         if (_selectedRingtone != null)
         {
-            await _ringtoneService.SaveSelectedRingtoneAsync(_selectedRingtone.Id);
+            // Salvează în Preferences
+            Preferences.Set("SelectedRingtone", _selectedRingtone.Id);
             _callback?.Invoke(_selectedRingtone);
             await Navigation.PopModalAsync();
         }
@@ -145,7 +165,7 @@ public partial class RingtonePickerPage : ContentPage, INotifyPropertyChanged
 
     private async void OnCancelClicked(object sender, EventArgs e)
     {
-        MediaPlayer.Stop();
+        await _audioService.StopPlayingAsync(); // ← Folosește IAudioService
         await Navigation.PopModalAsync();
     }
 
@@ -168,12 +188,13 @@ public partial class RingtonePickerPage : ContentPage, INotifyPropertyChanged
 
             if (result != null)
             {
-                var success = await _ringtoneService.ImportRingtoneFromPickerAsync(result);
+                // Import folosind IAudioService
+                var success = await _audioService.ImportRingtoneAsync(result.FullPath);
 
                 if (success)
                 {
                     await DisplayAlert("Success", "Ringtone imported successfully!", "OK");
-                    LoadRingtones();
+                    LoadRingtones(); // Reîncarcă lista
                 }
                 else
                 {
@@ -187,10 +208,10 @@ public partial class RingtonePickerPage : ContentPage, INotifyPropertyChanged
         }
     }
 
-    protected override void OnDisappearing()
+    protected override async void OnDisappearing()
     {
         base.OnDisappearing();
-        MediaPlayer.Stop();
+        await _audioService.StopPlayingAsync(); // ← Folosește IAudioService
     }
 
     public event PropertyChangedEventHandler PropertyChanged;

@@ -111,4 +111,13 @@
 	  <Folder Include="Views\" />
 	</ItemGroup>
 
+	<ItemGroup Condition="'$(TargetFramework)' == 'net9.0-android'">
+	  <PackageReference Include="Xamarin.AndroidX.LocalBroadcastManager">
+	    <Version>1.1.0.23</Version>
+	  </PackageReference>
+	  <PackageReference Include="Xamarin.AndroidX.MediaRouter">
+	    <Version>1.4.0</Version>
+	  </PackageReference>
+	</ItemGroup>
+
 </Project>
