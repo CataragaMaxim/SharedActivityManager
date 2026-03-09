@@ -16,17 +16,10 @@ namespace SharedActivityManager.Converters
             {
                 return type switch
                 {
-                    ActivityType.Sport => "Sport",
-                    ActivityType.Exercise => "Exercise",
                     ActivityType.Study => "Study",
                     ActivityType.Work => "Work",
-                    ActivityType.Meeting => "Meeting",
-                    ActivityType.Entertainment => "Entertainment",
                     ActivityType.Health => "Health",
-                    ActivityType.Family => "Family",
-                    ActivityType.Social => "Social",
-                    ActivityType.Shopping => "Shopping",
-                    ActivityType.Travel => "Travel",
+                    ActivityType.Personal => "Personal",
                     ActivityType.Other => "Other",
                     _ => type.ToString()
                 };
