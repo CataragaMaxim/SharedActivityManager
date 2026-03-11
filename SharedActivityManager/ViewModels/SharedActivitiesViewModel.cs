@@ -1,16 +1,18 @@
 ﻿// ViewModels/SharedActivitiesViewModel.cs
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SharedActivityManager.Models;
 using SharedActivityManager.Services;
-using System.Collections.ObjectModel;
+using SharedActivityManager.Repositories;
 
 namespace SharedActivityManager.ViewModels
 {
     public partial class SharedActivitiesViewModel : ObservableObject
     {
-        private readonly ActivityService _activityService;
+        private readonly IActivityService _activityService;
         private readonly IAlertService _alertService;
+        private readonly IMessagingService _messagingService;
 
         [ObservableProperty]
         private ObservableCollection<Activity> sharedActivities = new();
@@ -19,35 +21,47 @@ namespace SharedActivityManager.ViewModels
         private bool isLoading;
 
         [ObservableProperty]
-        private string currentUserId = "current_user"; // Simplificat pentru moment
+        private string currentUserId = "current_user";
 
         public SharedActivitiesViewModel()
         {
-            _activityService = new ActivityService();
-            _alertService = new AlertService(); // Sau PlatformServiceLocator.AlertService
-            LoadSharedActivities();
+            _activityService = new ActivityService(new ActivityRepository());
+            _alertService = new AlertService();
+            _messagingService = new MessagingService();
         }
 
         [RelayCommand]
-        private async Task LoadSharedActivities()
+        public async Task LoadSharedActivities()
         {
             try
             {
                 IsLoading = true;
-                var allActivities = await _activityService.GetActivitiesAsync();
 
-                // Filtrează activitățile publice care nu sunt ale utilizatorului curent
+                System.Diagnostics.Debug.WriteLine("=== LoadSharedActivities START ===");
+
+                var allActivities = await _activityService.GetActivitiesAsync();
+                System.Diagnostics.Debug.WriteLine($"Total activities in DB: {allActivities.Count}");
+
+                // Pentru testare - afișăm toate activitățile publice
                 var shared = allActivities
-                    .Where(a => a is Activity act &&
-                                act.IsPublic &&
-                                act.OwnerId != CurrentUserId)
-                    .Cast<Activity>()
+                    .Where(a => a.IsPublic)
                     .ToList();
 
+                System.Diagnostics.Debug.WriteLine($"Public activities found: {shared.Count}");
+
+                foreach (var act in shared)
+                {
+                    System.Diagnostics.Debug.WriteLine($"- ID: {act.Id}, Title: '{act.Title}', Desc: '{act.Desc}', Owner: {act.OwnerId}, Type: {act.TypeId}");
+                }
+
                 SharedActivities = new ObservableCollection<Activity>(shared);
+
+                System.Diagnostics.Debug.WriteLine("=== LoadSharedActivities END ===");
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error loading shared activities: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
                 await _alertService.ShowAlertAsync("Error", $"Failed to load shared activities: {ex.Message}");
             }
             finally
@@ -61,27 +75,32 @@ namespace SharedActivityManager.ViewModels
         {
             try
             {
+                System.Diagnostics.Debug.WriteLine("=== CopyToMyActivities START ===");
+
                 if (activity == null) return;
 
-                // 🔥 PROTOTYPE PATTERN IN ACTION: Deep Copy
+                // Deep Copy
                 var myCopy = activity.DeepCopy();
-
-                // Configurează copia pentru utilizatorul curent
                 myCopy.OwnerId = CurrentUserId;
-                myCopy.IsPublic = false; // Devine privată
-                myCopy.AlarmSet = false; // Fără alarmă implicit
+                myCopy.IsPublic = false;
+                myCopy.AlarmSet = false;
                 myCopy.OriginalActivityId = activity.Id;
 
                 await _activityService.SaveActivityAsync(myCopy);
 
+                System.Diagnostics.Debug.WriteLine($"Copy saved with ID: {myCopy.Id}");
+
+                // 🔥 DECLANȘĂ EVENIMENTUL - MainPage se va reîncărca
+                AppEvents.OnActivitiesChanged();
+
                 await _alertService.ShowAlertAsync("Success",
                     $"Activity '{activity.Title}' copied to your activities!");
 
-                // Reîncarcă lista (opțional)
                 await LoadSharedActivities();
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error copying activity: {ex.Message}");
                 await _alertService.ShowAlertAsync("Error", $"Failed to copy activity: {ex.Message}");
             }
         }
@@ -89,16 +108,41 @@ namespace SharedActivityManager.ViewModels
         [RelayCommand]
         private async Task ViewDetails(Activity activity)
         {
-            if (activity == null) return;
+            try
+            {
+                System.Diagnostics.Debug.WriteLine("=== ViewDetails START ===");
 
-            // Navighează la pagina de detalii (poți implementa mai târziu)
-            var details = activity.GetActivityDetails();
-            await _alertService.ShowAlertAsync(activity.Title, details);
+                if (activity == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("Activity is NULL!");
+                    return;
+                }
+
+                System.Diagnostics.Debug.WriteLine($"Viewing details for: {activity.Title}");
+
+                var details = $"Title: {activity.Title}\n" +
+                             $"Description: {activity.Desc}\n" +
+                             $"Type: {activity.TypeId}\n" +
+                             $"Date: {activity.StartDate:d}\n" +
+                             $"Time: {activity.StartTime:t}\n" +
+                             $"Owner: {activity.OwnerId}\n" +
+                             $"Public: {activity.IsPublic}\n" +
+                             $"ID: {activity.Id}";
+
+                await _alertService.ShowAlertAsync(activity.Title, details);
+
+                System.Diagnostics.Debug.WriteLine("=== ViewDetails END ===");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error viewing details: {ex.Message}");
+            }
         }
 
         [RelayCommand]
         private async Task Refresh()
         {
+            System.Diagnostics.Debug.WriteLine("Refresh command executed");
             await LoadSharedActivities();
         }
     }

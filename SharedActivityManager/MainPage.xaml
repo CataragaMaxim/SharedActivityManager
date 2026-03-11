@@ -10,26 +10,40 @@
     <Grid RowDefinitions="Auto,*">
 
         <VerticalStackLayout Grid.Row="0" Padding="20" Spacing="15">
-            <!-- MainPage.xaml - adaugă în zona de sus, lângă butonul de creare -->
-            <Button Grid.Column="2"
-                    Text="👥 Shared"
-                    BackgroundColor="#9C27B0"
-                    TextColor="White"
-                    CornerRadius="8"
-                    Padding="15,10"
-                    Command="{Binding NavigateToSharedCommand}"/>
-            <Label Text="Activity List"
-                   FontSize="28"
-                   FontAttributes="Bold"
-                   TextColor="#2196F3"
-                   HorizontalOptions="Center"/>
+            <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="10">
+                <Label Grid.Column="0" 
+               Text="Activity List"
+               FontSize="28"
+               FontAttributes="Bold"
+               TextColor="#2196F3"
+               VerticalOptions="Center"/>
 
+                <!-- Buton Shared Activities -->
+                <Button Grid.Column="1"
+                Text="👥 Shared"
+                BackgroundColor="#9C27B0"
+                TextColor="White"
+                CornerRadius="8"
+                Padding="15,10"
+                Clicked="OnSharedActivitiesClicked"/>
+
+                <!-- Buton Settings -->
+                <Button Grid.Column="2"
+                Text="⚙️"
+                BackgroundColor="#607D8B"
+                TextColor="White"
+                CornerRadius="8"
+                WidthRequest="50"
+                Clicked="OnSettingsClicked"/>
+            </Grid>
+
+            <!-- Buton Create New Activity -->
             <Button Text="+ Create New Activity"
-                    Clicked="OnModalOpen"
-                    BackgroundColor="#4CAF50"
-                    TextColor="White"
-                    CornerRadius="8"
-                    HeightRequest="50"/>
+            Clicked="OnModalOpen"
+            BackgroundColor="#4CAF50"
+            TextColor="White"
+            CornerRadius="8"
+            HeightRequest="50"/>
         </VerticalStackLayout>
 
         <!-- CollectionView direct în Grid, fără Grid în plus -->

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:SharedActivityManager.ViewModels"
+             xmlns:models="clr-namespace:SharedActivityManager.Models"
+             x:Class="SharedActivityManager.Views.SharedActivitiesPage"
+             Title="Shared Activities"
+             x:DataType="viewmodels:SharedActivitiesViewModel">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Header -->
+        <VerticalStackLayout Grid.Row="0" Padding="15" Spacing="10">
+            <Label Text="Activities Shared with You"
+                   FontSize="24"
+                   FontAttributes="Bold"
+                   TextColor="#2196F3"/>
+            <Label Text="Copy any activity to add it to your collection"
+                   FontSize="14"
+                   TextColor="#666666"/>
+        </VerticalStackLayout>
+
+        <!-- RefreshView -->
+        <RefreshView Grid.Row="1"
+                     Command="{Binding RefreshCommand}"
+                     IsRefreshing="{Binding IsLoading}">
+
+            <CollectionView ItemsSource="{Binding SharedActivities}"
+                            VerticalOptions="FillAndExpand"
+                            SelectionMode="None">
+
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout HorizontalOptions="Center" 
+                                         VerticalOptions="Center" 
+                                         Spacing="20">
+                        <Label Text="📭"
+                               FontSize="48"
+                               HorizontalOptions="Center"/>
+                        <Label Text="No shared activities yet"
+                               FontSize="18"
+                               TextColor="#666666"/>
+                        <Label Text="Share your activities with friends to see them here"
+                               FontSize="14"
+                               TextColor="#999999"
+                               HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:Activity">
+                        <Border Stroke="#E0E0E0"
+                                StrokeThickness="1"
+                                StrokeShape="RoundRectangle 10"
+                                Padding="15"
+                                Margin="10,5">
+
+                            <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*, Auto">
+
+                                <!-- Titlu și tip -->
+                                <Label Grid.Row="0" Grid.Column="0"
+                                       Text="{Binding Title}"
+                                       FontSize="18"
+                                       FontAttributes="Bold"
+                                       TextColor="#333333"/>
+
+                                <Label Grid.Row="0" Grid.Column="1"
+                                       Text="{Binding TypeId, StringFormat='[{0}]'}"
+                                       FontSize="12"
+                                       TextColor="#2196F3"
+                                       HorizontalOptions="End"/>
+
+                                <!-- Descriere -->
+                                <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                       Text="{Binding Desc}"
+                                       FontSize="14"
+                                       TextColor="#666666"
+                                       MaxLines="2"
+                                       LineBreakMode="TailTruncation"
+                                       Margin="0,5"
+                                       IsVisible="{Binding Desc, Converter={StaticResource StringNotNullOrEmpty}}"/>
+
+                                <!-- Info partajare și butoane -->
+                                <HorizontalStackLayout Grid.Row="2" Grid.Column="0"
+                                                       Spacing="10"
+                                                       VerticalOptions="Center">
+                                    <Label Text="👤 Shared by:"
+                                           FontSize="12"
+                                           TextColor="#999999"/>
+                                    <Label Text="{Binding OwnerId}"
+                                           FontSize="12"
+                                           FontAttributes="Bold"
+                                           TextColor="#4CAF50"/>
+                                    <Label Text="{Binding SharedDate, StringFormat='{0:dd.MM.yyyy}'}"
+                                           FontSize="12"
+                                           TextColor="#999999"/>
+                                </HorizontalStackLayout>
+
+                                <HorizontalStackLayout Grid.Row="2" Grid.Column="1"
+                                                       Spacing="10">
+                                    <!-- Buton Copy -->
+                                    <Button Text="📋 Copy"
+                                            BackgroundColor="#4CAF50"
+                                            TextColor="White"
+                                            CornerRadius="15"
+                                            Padding="15,8"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:SharedActivitiesViewModel}}, Path=CopyToMyActivitiesCommand}"
+                                            CommandParameter="{Binding .}"/>
+
+                                    <!-- Buton Details -->
+                                    <Button Text="👁️"
+                                            BackgroundColor="#2196F3"
+                                            TextColor="White"
+                                            WidthRequest="40"
+                                            CornerRadius="20"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:SharedActivitiesViewModel}}, Path=ViewDetailsCommand}"
+                                            CommandParameter="{Binding .}"/>
+                                </HorizontalStackLayout>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </RefreshView>
+    </Grid>
+</ContentPage>

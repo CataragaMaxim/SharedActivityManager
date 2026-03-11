@@ -1,5 +1,7 @@
-﻿using SharedActivityManager.ViewModels;
+﻿// ActivityModal.xaml.cs
+using SharedActivityManager.ViewModels;
 using SharedActivityManager.Models;
+using SharedActivityManager.Services;
 
 namespace SharedActivityManager;
 
@@ -17,12 +19,11 @@ public partial class ActivityModal : ContentPage
 
         BindingContext = _viewModel;
 
-        // IMPORTANT: Setează IsEditMode = false
         _viewModel.IsEditMode = false;
         _viewModel.PageTitle = "Create New Activity";
+        _viewModel.ResetForm();
 
         Title = "Create New Activity";
-        _viewModel.ResetForm();
     }
 
     // Constructor pentru EDITARE activitate
@@ -36,8 +37,7 @@ public partial class ActivityModal : ContentPage
 
             BindingContext = _viewModel;
 
-            // IMPORTANT: Setează IsEditMode = TRUE pentru editare
-            _viewModel.IsEditMode = true;  // ← Asigură-te că asta e aici
+            _viewModel.IsEditMode = true;
             _viewModel.PageTitle = "Edit Activity";
             _viewModel.SelectedActivity = activityToEdit;
 
@@ -60,25 +60,25 @@ public partial class ActivityModal : ContentPage
         _viewModel.SelectedStartDate = _activityToEdit.StartDate.Date;
         _viewModel.SelectedStartTime = _activityToEdit.StartTime.TimeOfDay;
         _viewModel.AlarmSet = _activityToEdit.AlarmSet;
-        _viewModel.SelectedReminderType = _activityToEdit.ReminderTypeId;
+        _viewModel.SelectedReminderType = _activityToEdit.ReminderType;
         _viewModel.SelectedRingTone = _activityToEdit.RingTone ?? "Default Alarm";
+        _viewModel.IsPublic = _activityToEdit.IsPublic;  // ← ACEASTA LIPSEA!
+
+        System.Diagnostics.Debug.WriteLine($"LoadActivityData - IsPublic: {_activityToEdit.IsPublic}");
     }
 
     // ===== METODE PENTRU BUTOANE =====
-
-    // Închidere modal
     private async void OnCloseModal(object sender, EventArgs e)
     {
         await Navigation.PopModalAsync();
     }
 
-    // Salvare activitate
     private async void OnSaveActivity(object sender, EventArgs e)
     {
         System.Diagnostics.Debug.WriteLine($"OnSaveActivity - IsEditMode: {_viewModel.IsEditMode}");
-        System.Diagnostics.Debug.WriteLine($"OnSaveActivity - _activityToEdit: {_activityToEdit?.Id}");
+
         try
-        {   
+        {
             if (_activityToEdit != null)
             {
                 await _viewModel.SaveEditedActivity();
@@ -87,6 +87,10 @@ public partial class ActivityModal : ContentPage
             {
                 await _viewModel.AddNewActivity();
             }
+
+            // 🔥 DECLANȘĂ EVENIMENTUL
+            AppEvents.OnActivitiesChanged();
+
             await Navigation.PopModalAsync();
         }
         catch (Exception ex)
@@ -96,7 +100,6 @@ public partial class ActivityModal : ContentPage
         }
     }
 
-    // Ștergere activitate
     private async void OnDeleteActivity(object sender, EventArgs e)
     {
         if (_activityToEdit == null) return;
@@ -113,21 +116,22 @@ public partial class ActivityModal : ContentPage
         }
     }
 
-    // ===== METODA PENTRU RINGTONE PICKER (ASTA LIPSEA) =====
     private async void OnChooseRingtoneClicked(object sender, EventArgs e)
     {
         try
         {
             bool wasEditMode = _viewModel.IsEditMode;
+            bool wasPublic = _viewModel.IsPublic;  // Salvăm starea
 
             var ringtonePicker = new RingtonePickerPage();
 
             ringtonePicker.SetRingtoneSelectedCallback((selectedRingtone) =>
             {
                 _viewModel.IsEditMode = wasEditMode;
+                _viewModel.IsPublic = wasPublic;  // Restaurăm starea
                 _viewModel.SelectedRingTone = selectedRingtone.DisplayName;
 
-                System.Diagnostics.Debug.WriteLine($"Ringtone selected. IsEditMode: {_viewModel.IsEditMode}");
+                System.Diagnostics.Debug.WriteLine($"Ringtone selected. IsEditMode: {_viewModel.IsEditMode}, IsPublic: {_viewModel.IsPublic}");
             });
 
             await Navigation.PushModalAsync(ringtonePicker);

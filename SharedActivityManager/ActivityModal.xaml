@@ -208,6 +208,35 @@
                 </VerticalStackLayout>
             </Border>
 
+            <!-- ActivityModal.xaml - după ringtone picker -->
+            <Border Stroke="#E0E0E0"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 10"
+                    Padding="15">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Sharing" 
+                           FontSize="14" 
+                           FontAttributes="Bold" 
+                           TextColor="#666666"/>
+
+                    <Grid ColumnDefinitions="Auto, *" ColumnSpacing="10">
+                        <Switch Grid.Column="0"
+                                IsToggled="{Binding IsPublic, Mode=TwoWay}"
+                                OnColor="#9C27B0"
+                                ThumbColor="White"/>
+
+                        <VerticalStackLayout Grid.Column="1">
+                            <Label Text="Share with friends"
+                                   FontSize="16"
+                                   TextColor="#333333"/>
+                            <Label Text="Others can see and copy this activity"
+                                   FontSize="12"
+                                   TextColor="#999999"/>
+                        </VerticalStackLayout>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
             <!-- Butoane acțiune -->
             <VerticalStackLayout Spacing="10" Margin="0,20,0,0">
 

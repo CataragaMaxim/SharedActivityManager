@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// Data/ActivityDataBase.cs - VERSIUNEA CORECTĂ
+using SharedActivityManager.Abstracts;
 using SharedActivityManager.Models;
 using SQLite;
 
@@ -11,6 +8,7 @@ namespace SharedActivityManager.Data
     public class ActivityDataBase
     {
         private readonly SQLiteAsyncConnection _connection;
+
         public ActivityDataBase()
         {
             string dbPath = Path.Combine(FileSystem.AppDataDirectory, "Activity.db");
@@ -23,16 +21,30 @@ namespace SharedActivityManager.Data
             return _connection.Table<Activity>().ToListAsync();
         }
 
-        public Task<int> SaveActivityAsync(Activity activity)
+        // 🔥 FIX: Pentru IActivity
+        public async Task<int> SaveActivityAsync(IActivity activity)
         {
-            if (activity.Id != 0)
+            if (activity is Activity act)
             {
-                return _connection.UpdateAsync(activity);
+                act.AdditionalDataJson = act.SerializeAdditionalData();
+
+                if (act.Id == 0)
+                    return await _connection.InsertAsync(act);  // ← era _database
+                else
+                    return await _connection.UpdateAsync(act);  // ← era _database
             }
+            return 0;
+        }
+
+        // 🔥 FIX: Pentru Activity direct
+        public async Task<int> SaveActivityAsync(Activity activity)
+        {
+            activity.AdditionalDataJson = activity.SerializeAdditionalData();
+
+            if (activity.Id == 0)
+                return await _connection.InsertAsync(activity);
             else
-            {
-                return _connection.InsertAsync(activity);
-            }
+                return await _connection.UpdateAsync(activity);
         }
 
         public Task<int> DeleteActivityAsync(Activity activity)

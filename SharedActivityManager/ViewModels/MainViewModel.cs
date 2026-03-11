@@ -1,28 +1,30 @@
-﻿using System;
+﻿// ViewModels/MainViewModel.cs
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SharedActivityManager.Abstracts.Platforms;
 using SharedActivityManager.Builders;
-using SharedActivityManager.Data;
 using SharedActivityManager.Enums;
-using SharedActivityManager.Factories;
 using SharedActivityManager.Models;
 using SharedActivityManager.Services;
+using SharedActivityManager.Repositories;
 
 namespace SharedActivityManager.ViewModels
 {
     public partial class MainViewModel : ObservableObject
     {
-        private readonly ActivityDataBase _database;
-        private readonly IAudioService _audioService;  // ← Folosim IAudioService
+        // ========== SERVICII ==========
+        private readonly IActivityService _activityService;
+        private readonly IAudioService _audioService;
         private readonly IAlarmService _alarmService;
+        private readonly IAlertService _alertService;
+        private readonly IMessagingService _messagingService;
 
+        // ========== PROPRIETĂȚI PENTRU COLECȚII ==========
         [ObservableProperty]
         private ObservableCollection<Activity> activities = new();
 
+        // ========== TOATE PROPRIETĂȚILE PENTRU FORMULAR ==========
         [ObservableProperty]
         private string newTaskTitle;
 
@@ -57,460 +59,69 @@ namespace SharedActivityManager.ViewModels
         private bool isEditMode;
 
         [ObservableProperty]
-        private string pageTitle;
+        private string pageTitle = "Create New Activity";
+
+        [ObservableProperty]
+        private bool isPublic;
 
         [ObservableProperty]
         private Activity selectedActivity;
 
+        // ========== PROPRIETĂȚI CALCULATE ==========
         public DateTime CombinedStartDateTime => SelectedStartDate.Add(SelectedStartTime);
 
+        // ========== PROPRIETĂȚI PENTRU LISTE ==========
         public ObservableCollection<ActivityType> ActivityTypeList { get; } =
-            new ObservableCollection<ActivityType>(Enum.GetValues<ActivityType>());
+            new ObservableCollection<ActivityType>(Enum.GetValues<ActivityType>().Cast<ActivityType>());
 
         public ObservableCollection<ReminderType> ReminderTypeList { get; } =
-            new ObservableCollection<ReminderType>(Enum.GetValues<ReminderType>());
+            new ObservableCollection<ReminderType>(Enum.GetValues<ReminderType>().Cast<ReminderType>());
 
-        public ObservableCollection<string> RingToneList { get; } =
-            new ObservableCollection<string>
-            {
-                "Default Alarm",
-                "Digital Beep",
-                "Gentle Wake",
-                "Morning Bliss",
-                "Classic Ring"
-            };
+        public ObservableCollection<string> RingToneList { get; } = new ObservableCollection<string>
+        {
+            "Default Alarm",
+            "Digital Beep",
+            "Gentle Wake",
+            "Morning Bliss",
+            "Classic Ring"
+        };
 
+        // ========== CONSTRUCTOR ==========
         public MainViewModel()
         {
-            _database = new ActivityDataBase();
+            // Inițializare servicii
+            _activityService = new ActivityService(new ActivityRepository());
             _alarmService = PlatformServiceLocator.AlarmService;
-            _audioService = PlatformServiceLocator.AudioService;  // ← Folosim AudioService
+            _audioService = PlatformServiceLocator.AudioService;
+            _alertService = new AlertService();
+            _messagingService = new MessagingService();
 
-            activities = new ObservableCollection<Activity>();
+            // Abonare la mesaje
+            _messagingService.Subscribe<ActivitiesChangedMessage>(this, OnActivitiesChanged);
 
-            // Încarcă activitățile
-            Task.Run(async () => await LoadActivities()).Wait();
+            // Încărcare date inițiale
+            Task.Run(async () => await LoadActivitiesAsync()).Wait();
 
+            // Încărcare setări
             LoadSavedRingtone();
             UpdateNextReminderPreview();
 
-            // Restaurează alarmele
+            // Restaurare alarme
             Task.Run(async () => await RestoreAlarmsAsync());
         }
 
-        [RelayCommand]
-        private async Task NavigateToShared()
+        private async void OnActivitiesChanged(ActivitiesChangedMessage message)
         {
-            await Shell.Current.GoToAsync("//sharedactivities"); // Sau Navigation.PushAsync(new SharedActivitiesPage())
-        }
+            System.Diagnostics.Debug.WriteLine($"ActivitiesChanged: {message.Action}");
 
-        // ViewModels/MainViewModel.cs
-        [RelayCommand]
-        private async Task TestNotificationBuilder()
-        {
-            try
+            // Reîncarcă activitățile pe UI thread
+            await MainThread.InvokeOnMainThreadAsync(async () =>
             {
-                System.Diagnostics.Debug.WriteLine("=== Testing Notification Builder ===");
-
-                var director = new NotificationDirector();
-                var builder = new NotificationBuilder();
-                director.Builder = builder;
-
-                director.BuildAlarmNotification("Test Alarm", "This is a test alarm", 999, "Default Alarm");
-                var alarmNotification = builder.GetNotification();
-
-                System.Diagnostics.Debug.WriteLine(alarmNotification.GetDescription());
-
-                director.BuildReminderNotification("Test Reminder", "Don't forget to test the builder!");
-                var reminderNotification = builder.GetNotification();
-
-                System.Diagnostics.Debug.WriteLine(reminderNotification.GetDescription());
-
-                // Construcție personalizată
-                builder.SetTitle("Custom Notification");
-                builder.SetContent("This is a custom notification");
-                builder.SetPriority(AppNotificationPriority.High);
-                builder.SetVibration(new long[] { 0, 200, 100, 200 });
-                builder.AddButton("OK", "ok_action", 0);
-                builder.SetTimeout(TimeSpan.FromSeconds(5));
-
-                var customNotification = builder.GetNotification();
-                System.Diagnostics.Debug.WriteLine(customNotification.GetDescription());
-
-                // 🔥 FIX: Folosește Application.Current.MainPage în loc de DisplayAlert direct
-                var currentPage = Application.Current?.MainPage;
-                if (currentPage != null)
-                {
-                    await currentPage.DisplayAlert("Success", "Notification builder test completed! Check output window for details.", "OK");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error testing notification builder: {ex.Message}");
-
-                var currentPage = Application.Current?.MainPage;
-                if (currentPage != null)
-                {
-                    await currentPage.DisplayAlert("Error", $"Test failed: {ex.Message}", "OK");
-                }
-            }
-        }
-
-        // Restaurează alarmele la pornire
-        private async Task RestoreAlarmsAsync()
-        {
-            try
-            {
-                await _alarmService.RestoreAlarmsAsync(Activities.ToList());
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error restoring alarms: {ex.Message}");
-            }
-        }
-
-        // Încarcă ringtone-ul salvat
-        private async void LoadSavedRingtone()
-        {
-            try
-            {
-                var savedRingtoneId = Preferences.Get("SelectedRingtone", "default1");
-                var ringtones = await _audioService.GetAvailableRingtonesAsync();  // ← Folosim _audioService
-                SelectedRingtoneObject = ringtones.FirstOrDefault(r => r.Id == savedRingtoneId);
-                SelectedRingTone = SelectedRingtoneObject?.DisplayName ?? "Default Alarm";
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading saved ringtone: {ex.Message}");
-                SelectedRingTone = "Default Alarm";
-            }
-        }
-
-        // Încărcare activități
-        [RelayCommand]
-        private async Task LoadActivities()
-        {
-            var activitiesFromDb = await _database.GetActivitiesAsync();
-            Activities = new ObservableCollection<Activity>(activitiesFromDb.OrderBy(a => a.StartDate));
-        }
-
-        // Adăugare activitate nouă
-        [RelayCommand]
-        private async Task AddActivity()
-        {
-            if (string.IsNullOrWhiteSpace(NewTaskTitle))
-            {
-                await App.Current.MainPage.DisplayAlert("Validation",
-                    "Title is required", "OK");
-                return;
-            }
-
-            try
-            {
-                var newActivity = new Activity
-                {
-                    Title = NewTaskTitle,
-                    Desc = NewTaskDesc ?? string.Empty,
-                    TypeId = SelectedActivityType,
-                    StartDate = SelectedStartDate,
-                    StartTime = CombinedStartDateTime,
-                    AlarmSet = AlarmSet,
-                    isCompleted = false,
-                    ReminderTypeId = SelectedReminderType,
-                    NextReminderDate = CalculateNextReminderDate(),
-                    RingTone = SelectedRingTone ?? "Default"
-                };
-
-                await _database.SaveActivityAsync(newActivity);
-
-                if (newActivity.AlarmSet)
-                {
-                    await _alarmService.ScheduleAlarmAsync(newActivity);
-                }
-
-                Activities.Add(newActivity);
-                Activities = new ObservableCollection<Activity>(Activities.OrderBy(a => a.StartDate));
-                ResetForm();
-
-                await App.Current.MainPage.DisplayAlert("Success",
-                    "Activity added successfully!", "OK");
-            }
-            catch (Exception ex)
-            {
-                await App.Current.MainPage.DisplayAlert("Error",
-                    $"Failed to add activity: {ex.Message}", "OK");
-            }
-        }
-
-        // Salvare activitate editată
-        public async Task SaveEditedActivity()
-        {
-            if (SelectedActivity == null) return;
-
-            System.Diagnostics.Debug.WriteLine($"=== SaveEditedActivity START ===");
-            System.Diagnostics.Debug.WriteLine($"Activity ID: {SelectedActivity.Id}");
-            System.Diagnostics.Debug.WriteLine($"Activity Title: {SelectedActivity.Title}");
-            System.Diagnostics.Debug.WriteLine($"Current AlarmSet (form): {AlarmSet}");
-            System.Diagnostics.Debug.WriteLine($"Current isCompleted (form): {SelectedActivity.isCompleted}");
-
-            if (string.IsNullOrWhiteSpace(NewTaskTitle))
-            {
-                await App.Current.MainPage.DisplayAlert("Validation", "Title is required", "OK");
-                return;
-            }
-
-            try
-            {
-                int activityId = SelectedActivity.Id;
-
-                // 🔥 FIX: Anulează alarma și așteaptă confirmarea
-                System.Diagnostics.Debug.WriteLine($"Cancelling old alarm for ID: {SelectedActivity.Id}");
-                await _alarmService.CancelAlarmAsync(SelectedActivity.Id);
-
-                // 🔥 FIX: O mică pauză pentru a permite anularea completă
-                await Task.Delay(200);
-
-                // Update the activity with form values
-                SelectedActivity.Title = NewTaskTitle;
-                SelectedActivity.Desc = NewTaskDesc ?? string.Empty;
-                SelectedActivity.TypeId = SelectedActivityType;
-                SelectedActivity.StartDate = SelectedStartDate.Date;
-                SelectedActivity.StartTime = DateTime.Today.Add(SelectedStartTime);
-                SelectedActivity.AlarmSet = AlarmSet;
-                SelectedActivity.ReminderTypeId = SelectedReminderType;
-                SelectedActivity.NextReminderDate = CalculateNextReminderDate();
-                SelectedActivity.RingTone = SelectedRingTone ?? "Default";
-
-                await _database.SaveActivityAsync(SelectedActivity);
-                System.Diagnostics.Debug.WriteLine($"Activity saved to database");
-
-                if (AlarmSet && !SelectedActivity.isCompleted)
-                {
-                    System.Diagnostics.Debug.WriteLine($"SCHEDULING NEW ALARM for activity {SelectedActivity.Id}");
-                    await _alarmService.ScheduleAlarmAsync(SelectedActivity);
-                    System.Diagnostics.Debug.WriteLine($"ScheduleAlarmAsync completed");
-                }
-                else
-                {
-                    if (!AlarmSet)
-                        System.Diagnostics.Debug.WriteLine($"No new alarm scheduled - AlarmSet is false");
-                    else if (SelectedActivity.isCompleted)
-                        System.Diagnostics.Debug.WriteLine($"No new alarm scheduled - Activity is completed");
-                }
-
                 await LoadActivitiesAsync();
-                await App.Current.MainPage.DisplayAlert("Success", "Activity updated successfully!", "OK");
-
-                System.Diagnostics.Debug.WriteLine($"=== SaveEditedActivity END ===");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"ERROR in SaveEditedActivity: {ex.Message}");
-                await App.Current.MainPage.DisplayAlert("Error", $"Failed to update activity: {ex.Message}", "OK");
-            }
+            });
         }
 
-        // Adăugare activitate nouă (versiunea Task)
-        private ActivityCreator GetActivityCreator()
-        {
-            return ActivityFactoryRegistry.GetCreator(SelectedActivityType);
-        }
-
-        public async Task AddNewActivity()
-        {
-            if (string.IsNullOrWhiteSpace(NewTaskTitle))
-            {
-                await App.Current.MainPage.DisplayAlert("Validation", "Title is required", "OK");
-                return;
-            }
-
-            try
-            {
-                var additionalParams = new Dictionary<string, object>();
-
-                switch (SelectedActivityType)
-                {
-                    case ActivityType.Work:
-                        additionalParams["Priority"] = "Medium";
-                        additionalParams["ProjectName"] = "General";
-                        break;
-                    case ActivityType.Personal:
-                        additionalParams["Location"] = "Home";
-                        additionalParams["Mood"] = "Relaxed";
-                        break;
-                    case ActivityType.Health:
-                        additionalParams["HealthType"] = "Gym";
-                        additionalParams["DurationMinutes"] = 30;
-                        break;
-                    case ActivityType.Study:
-                        additionalParams["Subject"] = "General";
-                        additionalParams["Mode"] = "Reading";
-                        break;
-                }
-
-                var creator = GetActivityCreator();
-                var newActivity = await creator.CreateAndConfigureActivity(
-                    NewTaskTitle,
-                    NewTaskDesc ?? string.Empty,
-                    CombinedStartDateTime,
-                    additionalParams
-                );
-
-                newActivity.StartDate = SelectedStartDate.Date;
-                newActivity.ReminderTypeId = SelectedReminderType;
-                newActivity.NextReminderDate = CalculateNextReminderDate();
-                newActivity.RingTone = SelectedRingTone ?? "Default Alarm";
-
-                await _database.SaveActivityAsync(newActivity);
-
-                if (newActivity.AlarmSet)
-                {
-                    await _alarmService.ScheduleAlarmAsync(newActivity);
-                }
-
-                Activities.Add(newActivity);
-                Activities = new ObservableCollection<Activity>(Activities.OrderBy(a => a.StartDate));
-                ResetForm();
-
-                await App.Current.MainPage.DisplayAlert("Success", "Activity added successfully!", "OK");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error adding activity: {ex.Message}");
-                await App.Current.MainPage.DisplayAlert("Error", $"Failed to add activity: {ex.Message}", "OK");
-            }
-        }
-
-        // Încărcare activități (versiunea Task)
-        public async Task LoadActivitiesAsync()
-        {
-            try
-            {
-                var activitiesFromDb = await _database.GetActivitiesAsync();
-                Activities = new ObservableCollection<Activity>(
-                    activitiesFromDb.OrderBy(a => a.StartDate));
-            }
-            catch (Exception ex)
-            {
-                await App.Current.MainPage.DisplayAlert("Error",
-                    $"Failed to load activities: {ex.Message}", "OK");
-            }
-        }
-
-        // Ștergere activitate
-        [RelayCommand]
-        public async Task DeleteActivity(Activity activity)
-        {
-            if (activity == null) return;
-
-            try
-            {
-                await _alarmService.CancelAlarmAsync(activity.Id);
-                await _database.DeleteActivityAsync(activity);
-                Activities.Remove(activity);
-            }
-            catch (Exception ex)
-            {
-                await App.Current.MainPage.DisplayAlert("Error", $"Failed to delete activity: {ex.Message}", "OK");
-            }
-        }
-
-        // Ștergere activitate curentă
-        [RelayCommand]
-        public async Task DeleteCurrentActivity()
-        {
-            if (SelectedActivity != null)
-            {
-                await DeleteActivity(SelectedActivity);
-            }
-        }
-
-        // Salvare activitate (determină automat dacă e editare sau adăugare)
-        [RelayCommand]
-        public async Task SaveActivity()
-        {
-            if (IsEditMode && SelectedActivity != null)
-            {
-                await SaveEditedActivity();
-            }
-            else
-            {
-                await AddNewActivity();
-            }
-        }
-
-        // Toggle completare activitate
-        [RelayCommand]
-        private async Task ToggleComplete(Activity activity)  // ← Schimbat din void în Task
-        {
-            if (activity != null)
-            {
-                activity.isCompleted = !activity.isCompleted;
-
-                if (activity.isCompleted)
-                {
-                    await _alarmService.CancelAlarmAsync(activity.Id);
-                }
-                else if (activity.AlarmSet)
-                {
-                    await _alarmService.ScheduleAlarmAsync(activity);
-                }
-
-                await _database.SaveActivityAsync(activity);
-
-                var index = Activities.IndexOf(activity);
-                if (index >= 0)
-                {
-                    Activities[index] = activity;
-                }
-            }
-        }
-
-        // Editare activitate
-        [RelayCommand]
-        private void EditActivity(Activity activity)
-        {
-            if (activity == null) return;
-            SelectedActivity = activity;
-        }
-
-        // Resetare formular
-        [RelayCommand]
-        public void ResetForm()
-        {
-            NewTaskTitle = string.Empty;
-            NewTaskDesc = string.Empty;
-            SelectedActivityType = ActivityType.Other;
-            SelectedStartDate = DateTime.Today;
-            SelectedStartTime = DateTime.Now.TimeOfDay;
-            AlarmSet = false;
-            SelectedReminderType = ReminderType.None;
-            SelectedRingTone = "Default Alarm";
-            SelectedRingtoneObject = null;
-
-            UpdateNextReminderPreview();
-        }
-
-        // Calculare dată următor reminder
-        public DateTime CalculateNextReminderDate()
-        {
-            var startDateTime = CombinedStartDateTime;
-
-            if (!AlarmSet || SelectedReminderType == ReminderType.None)
-                return startDateTime;
-
-            return SelectedReminderType switch
-            {
-                ReminderType.Daily => startDateTime.AddDays(1),
-                ReminderType.Weekly => startDateTime.AddDays(7),
-                ReminderType.EveryTwoWeeks => startDateTime.AddDays(14),
-                ReminderType.Monthly => startDateTime.AddMonths(1),
-                ReminderType.Yearly => startDateTime.AddYears(1),
-                _ => startDateTime
-            };
-        }
-
-        // Update previzualizare reminder
+        // ========== PARTIAL METHODS ==========
         partial void OnSelectedStartDateChanged(DateTime value)
         {
             UpdateNextReminderPreview();
@@ -531,34 +142,322 @@ namespace SharedActivityManager.ViewModels
             UpdateNextReminderPreview();
         }
 
+        // ========== METODE PRIVATE ==========
+        private async Task RestoreAlarmsAsync()
+        {
+            try
+            {
+                await _alarmService.RestoreAlarmsAsync(Activities.ToList());
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error restoring alarms: {ex.Message}");
+            }
+        }
+
+        private async void LoadSavedRingtone()
+        {
+            try
+            {
+                var savedRingtoneId = Preferences.Get("SelectedRingtone", "default1");
+                var ringtones = await _audioService.GetAvailableRingtonesAsync();
+                SelectedRingtoneObject = ringtones.FirstOrDefault(r => r.Id == savedRingtoneId);
+                SelectedRingTone = SelectedRingtoneObject?.DisplayName ?? "Default Alarm";
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading saved ringtone: {ex.Message}");
+                SelectedRingTone = "Default Alarm";
+            }
+        }
+
         private void UpdateNextReminderPreview()
         {
             NextReminderDatePreview = CalculateNextReminderDate();
         }
 
-        // Metodă pentru deschiderea ringtone picker
-        [RelayCommand]
-        private async Task OpenRingtonePicker()
+        private DateTime CalculateNextReminderDate()
         {
-            await Task.CompletedTask;
+            var startDateTime = CombinedStartDateTime;
+
+            if (!AlarmSet || SelectedReminderType == ReminderType.None)
+                return startDateTime;
+
+            return SelectedReminderType switch
+            {
+                ReminderType.Daily => startDateTime.AddDays(1),
+                ReminderType.Weekly => startDateTime.AddDays(7),
+                ReminderType.EveryTwoWeeks => startDateTime.AddDays(14),
+                ReminderType.Monthly => startDateTime.AddMonths(1),
+                ReminderType.Yearly => startDateTime.AddYears(1),
+                _ => startDateTime
+            };
         }
 
+        // ========== COMENZI ==========
+        [RelayCommand]
+        private async Task NavigateToShared()
+        {
+            await Shell.Current.GoToAsync("//sharedactivities");
+        }
+
+        // ViewModels/MainViewModel.cs - adaugă această metodă dacă nu există
+        [RelayCommand]
+        public async Task LoadActivitiesAsync()
+        {
+            try
+            {
+                System.Diagnostics.Debug.WriteLine("MainViewModel: Loading activities...");
+                var activitiesFromDb = await _activityService.GetActivitiesAsync();
+                Activities = new ObservableCollection<Activity>(activitiesFromDb.OrderBy(a => a.StartDate));
+
+                System.Diagnostics.Debug.WriteLine($"MainViewModel: Loaded {Activities.Count} activities");
+
+                // Afișează activitățile în debug
+                foreach (var a in Activities)
+                {
+                    System.Diagnostics.Debug.WriteLine($"- {a.Title} (ID: {a.Id})");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading activities: {ex.Message}");
+                await _alertService.ShowAlertAsync("Error", $"Failed to load activities: {ex.Message}");
+            }
+        }
+
+        [RelayCommand]
+        private async Task AddActivity()
+        {
+            if (string.IsNullOrWhiteSpace(NewTaskTitle))
+            {
+                await _alertService.ShowAlertAsync("Validation", "Title is required");
+                return;
+            }
+
+            try
+            {
+                var newActivity = new Activity
+                {
+                    Title = NewTaskTitle,
+                    Desc = NewTaskDesc ?? string.Empty,
+                    TypeId = SelectedActivityType,
+                    StartDate = SelectedStartDate,
+                    StartTime = CombinedStartDateTime,
+                    AlarmSet = AlarmSet,
+                    IsCompleted = false,
+                    ReminderType = SelectedReminderType,
+                    NextReminderDate = CalculateNextReminderDate(),
+                    RingTone = SelectedRingTone ?? "Default",
+                    IsPublic = IsPublic,  // ← Asta e important!
+                    OwnerId = "current_user",
+                    SharedDate = IsPublic ? DateTime.Now : default
+                };
+
+                System.Diagnostics.Debug.WriteLine($"=== Adding Activity ===");
+                System.Diagnostics.Debug.WriteLine($"Title: {newActivity.Title}");
+                System.Diagnostics.Debug.WriteLine($"IsPublic: {newActivity.IsPublic}");
+                System.Diagnostics.Debug.WriteLine($"OwnerId: {newActivity.OwnerId}");
+
+                await _activityService.SaveActivityWithAlarmAsync(newActivity, _alarmService);
+                await LoadActivitiesAsync();
+                ResetForm();
+
+                await _alertService.ShowAlertAsync("Success", "Activity added successfully!");
+            }
+            catch (Exception ex)
+            {
+                await _alertService.ShowAlertAsync("Error", $"Failed to add activity: {ex.Message}");
+            }
+        }
+
+        public async Task SaveEditedActivity()
+        {
+            if (SelectedActivity == null) return;
+
+            System.Diagnostics.Debug.WriteLine($"=== SaveEditedActivity START ===");
+            System.Diagnostics.Debug.WriteLine($"Activity ID: {SelectedActivity.Id}");
+            System.Diagnostics.Debug.WriteLine($"Activity Title: {SelectedActivity.Title}");
+            System.Diagnostics.Debug.WriteLine($"IsPublic (form): {IsPublic}");
+            System.Diagnostics.Debug.WriteLine($"Activity.IsPublic before: {SelectedActivity.IsPublic}");
+
+            if (string.IsNullOrWhiteSpace(NewTaskTitle))
+            {
+                await _alertService.ShowAlertAsync("Validation", "Title is required");
+                return;
+            }
+
+            try
+            {
+                // Anulează alarma veche
+                await _alarmService.CancelAlarmAsync(SelectedActivity.Id);
+                await Task.Delay(200);
+
+                // Update the activity with form values
+                SelectedActivity.Title = NewTaskTitle;
+                SelectedActivity.Desc = NewTaskDesc ?? string.Empty;
+                SelectedActivity.TypeId = SelectedActivityType;
+                SelectedActivity.StartDate = SelectedStartDate.Date;
+                SelectedActivity.StartTime = CombinedStartDateTime;
+                SelectedActivity.AlarmSet = AlarmSet;
+                SelectedActivity.ReminderType = SelectedReminderType;
+                SelectedActivity.NextReminderDate = CalculateNextReminderDate();
+                SelectedActivity.RingTone = SelectedRingTone ?? "Default";
+                SelectedActivity.IsPublic = IsPublic;  // ← IMPORTANT!
+
+                // Dacă devine publică, actualizăm SharedDate
+                if (SelectedActivity.IsPublic && SelectedActivity.SharedDate == default)
+                {
+                    SelectedActivity.SharedDate = DateTime.Now;
+                }
+
+                System.Diagnostics.Debug.WriteLine($"Activity.IsPublic after: {SelectedActivity.IsPublic}");
+
+                await _activityService.SaveActivityAsync(SelectedActivity);
+
+                if (AlarmSet && !SelectedActivity.IsCompleted)
+                {
+                    await _alarmService.ScheduleAlarmAsync(SelectedActivity);
+                }
+
+                await LoadActivitiesAsync();
+                await _alertService.ShowAlertAsync("Success", "Activity updated successfully!");
+
+                System.Diagnostics.Debug.WriteLine($"=== SaveEditedActivity END ===");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ERROR in SaveEditedActivity: {ex.Message}");
+                await _alertService.ShowAlertAsync("Error", $"Failed to update activity: {ex.Message}");
+            }
+        }
+
+        public async Task AddNewActivity()
+        {
+            await AddActivity();
+        }
+
+        [RelayCommand]
+        public async Task DeleteActivity(Activity activity)
+        {
+            if (activity == null) return;
+
+            try
+            {
+                await _alarmService.CancelAlarmAsync(activity.Id);
+                await _activityService.DeleteActivityAsync(activity);
+                await LoadActivitiesAsync();
+            }
+            catch (Exception ex)
+            {
+                await _alertService.ShowAlertAsync("Error", $"Failed to delete activity: {ex.Message}");
+            }
+        }
+
+        [RelayCommand]
+        public async Task DeleteCurrentActivity()
+        {
+            if (SelectedActivity != null)
+            {
+                await DeleteActivity(SelectedActivity);
+            }
+        }
+
+        [RelayCommand]
+        public async Task SaveActivity()
+        {
+            if (IsEditMode && SelectedActivity != null)
+            {
+                await SaveEditedActivity();
+            }
+            else
+            {
+                await AddNewActivity();
+            }
+        }
+
+        [RelayCommand]
+        private async Task ToggleComplete(Activity activity)
+        {
+            if (activity != null)
+            {
+                activity.IsCompleted = !activity.IsCompleted;  // ← folosește IsCompleted
+
+                if (activity.IsCompleted)
+                {
+                    await _alarmService.CancelAlarmAsync(activity.Id);
+                }
+                else if (activity.AlarmSet)
+                {
+                    await _alarmService.ScheduleAlarmAsync(activity);
+                }
+
+                await _activityService.SaveActivityAsync(activity);
+
+                var index = Activities.IndexOf(activity);
+                if (index >= 0)
+                {
+                    Activities[index] = activity;
+                }
+            }
+        }
+
+        [RelayCommand]
+        private void EditActivity(Activity activity)
+        {
+            if (activity == null) return;
+
+            NewTaskTitle = activity.Title;
+            NewTaskDesc = activity.Desc;
+            SelectedActivityType = activity.TypeId;
+            SelectedStartDate = activity.StartDate.Date;
+            SelectedStartTime = activity.StartTime.TimeOfDay;
+            AlarmSet = activity.AlarmSet;
+            SelectedReminderType = activity.ReminderType;  // ← folosește ReminderType
+            SelectedRingTone = activity.RingTone ?? "Default Alarm";
+            IsPublic = activity.IsPublic;
+
+            SelectedActivity = activity;
+            IsEditMode = true;
+            PageTitle = "Edit Activity";
+        }
+
+        [RelayCommand]
+        public void ResetForm()
+        {
+            NewTaskTitle = string.Empty;
+            NewTaskDesc = string.Empty;
+            SelectedActivityType = ActivityType.Other;
+            SelectedStartDate = DateTime.Today;
+            SelectedStartTime = DateTime.Now.TimeOfDay;
+            AlarmSet = false;
+            SelectedReminderType = ReminderType.None;
+            SelectedRingTone = "Default Alarm";
+            SelectedRingtoneObject = null;
+            IsPublic = false;
+            IsEditMode = false;
+            PageTitle = "Create New Activity";
+            SelectedActivity = null;
+
+            UpdateNextReminderPreview();
+        }
+
+        // ========== METODE PUBLICE ==========
         public async Task SaveActivityToDatabase(Activity activity)
         {
-            await _database.SaveActivityAsync(activity);
-            await LoadActivities();
+            await _activityService.SaveActivityAsync(activity);
+            await LoadActivitiesAsync();
         }
 
         public async Task AddActivityToDatabase(Activity activity)
         {
-            await _database.SaveActivityAsync(activity);
-            await LoadActivities();
+            await _activityService.SaveActivityAsync(activity);
+            await LoadActivitiesAsync();
         }
 
-        // Obține lista de ringtone-uri disponibile - FIXAT
         public async Task<List<RingtoneProj>> GetAvailableRingtonesAsync()
         {
-            return await _audioService.GetAvailableRingtonesAsync();  // ← Folosește _audioService
+            return await _audioService.GetAvailableRingtonesAsync();
         }
     }
 }

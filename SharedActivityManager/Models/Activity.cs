@@ -1,4 +1,4 @@
-﻿// Models/Activity.cs
+﻿// Models/Activity.cs (versiunea corectată)
 using System.Text.Json;
 using SharedActivityManager.Abstracts;
 using SharedActivityManager.Enums;
@@ -16,7 +16,23 @@ namespace SharedActivityManager.Models
         public string Desc { get; set; }
         public DateTime StartTime { get; set; }
         public bool AlarmSet { get; set; }
-        public bool IsCompleted { get; set; }
+
+        // 🔥 FIX: Adaugă ambele forme pentru compatibilitate
+        private bool _isCompleted;
+        public bool IsCompleted
+        {
+            get => _isCompleted;
+            set => _isCompleted = value;
+        }
+
+        // Proprietate pentru compatibilitate cu codul existent
+        [Ignore]
+        public bool isCompleted
+        {
+            get => IsCompleted;
+            set => IsCompleted = value;
+        }
+
         public string RingTone { get; set; }
 
         // Proprietăți pentru baza de date
@@ -24,13 +40,13 @@ namespace SharedActivityManager.Models
         public DateTime StartDate { get; set; }
         public DateTime NextReminderDate { get; set; }
 
-        // 🔥 NOU: Proprietăți pentru partajare
-        public bool IsPublic { get; set; } = false; // true = visible to friends
-        public string OwnerId { get; set; } = "current_user"; // Default user
+        // 🔥 FIX: Proprietăți pentru partajare
+        public bool IsPublic { get; set; } = false;
+        public string OwnerId { get; set; } = "current_user";
         public DateTime SharedDate { get; set; }
-        public int OriginalActivityId { get; set; } = 0; // 0 = original, >0 = copy
+        public int OriginalActivityId { get; set; } = 0;
 
-        // Pentru ReminderType - stocăm ca int în DB, dar expunem ca enum
+        // 🔥 FIX: Pentru ReminderType
         public int ReminderTypeValue { get; set; }
 
         [Ignore]
@@ -40,74 +56,42 @@ namespace SharedActivityManager.Models
             set => ReminderTypeValue = (int)value;
         }
 
+        // Proprietate pentru compatibilitate
+        [Ignore]
+        public ReminderType ReminderTypeId
+        {
+            get => ReminderType;
+            set => ReminderType = value;
+        }
+
         // JSON cu date suplimentare
         public string AdditionalDataJson { get; set; }
 
-        // ===== PROTOTYPE PATTERN IMPLEMENTATION =====
-
-        /// <summary>
-        /// Shallow Copy - copiază doar referințele (obiectul nou și cel vechi partajează datele)
-        /// </summary>
+        // ===== METODE =====
         public Activity ShallowCopy()
         {
             return (Activity)this.MemberwiseClone();
         }
 
-        /// <summary>
-        /// Deep Copy - creează o copie complet independentă
-        /// </summary>
         public Activity DeepCopy()
         {
-            // Facem shallow copy inițial
             Activity clone = (Activity)this.MemberwiseClone();
-
-            // Resetăm ID-ul pentru a fi o activitate nouă
             clone.Id = 0;
-
-            // Păstrăm referința către activitatea originală
             clone.OriginalActivityId = this.Id;
-
-            // Copiem string-urile (sunt reference types)
             clone.Title = string.Copy(this.Title ?? "");
             clone.Desc = string.Copy(this.Desc ?? "");
             clone.RingTone = string.Copy(this.RingTone ?? "");
 
-            // Copiem și AdditionalDataJson dacă există
             if (!string.IsNullOrEmpty(this.AdditionalDataJson))
             {
                 clone.AdditionalDataJson = string.Copy(this.AdditionalDataJson);
             }
 
-            // Datele de partajare
-            clone.IsPublic = this.IsPublic;
-            clone.OwnerId = string.Copy(this.OwnerId ?? "current_user");
-            clone.SharedDate = DateTime.Now;
-
             return clone;
         }
 
-        /// <summary>
-        /// Creează o copie pentru partajare (Deep Copy cu setări specifice)
-        /// </summary>
-        public Activity CreateSharedCopy(string sharedBy)
-        {
-            var clone = this.DeepCopy();
-            clone.OwnerId = sharedBy;
-            clone.IsPublic = true;
-            clone.SharedDate = DateTime.Now;
-            clone.AlarmSet = false; // Activitatea partajată nu are alarmă implicit
-            return clone;
-        }
+        public object Clone() => DeepCopy();
 
-        /// <summary>
-        /// Implementare ICloneable pentru compatibilitate
-        /// </summary>
-        public object Clone()
-        {
-            return this.DeepCopy();
-        }
-
-        // Metode din IActivity
         public virtual string GetActivityType() => TypeId.ToString();
         public virtual string GetActivityDetails() => Title;
 
@@ -134,7 +118,7 @@ namespace SharedActivityManager.Models
             catch { }
         }
 
-        // Metodele IActivity - implementare default
+        // Metodele IActivity
         public virtual TimeSpan GetDuration() => TimeSpan.Zero;
         public virtual bool RequiresPreparation() => false;
         public virtual string GetNotificationMessage() => $"⏰ {Title}";
