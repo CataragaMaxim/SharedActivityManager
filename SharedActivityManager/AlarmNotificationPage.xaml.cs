@@ -42,9 +42,14 @@ public partial class AlarmNotificationPage : ContentPage
     {
         try
         {
-            System.Diagnostics.Debug.WriteLine("AlarmNotificationPage: Stopping alarm");
+            System.Diagnostics.Debug.WriteLine("AlarmNotificationPage: Stop button clicked");
 
-            // Folosește PlatformServiceLocator pentru a obține serviciul corect
+            // 🔥 FIX: Asigură-te că oprești sunetul înainte de a închide pagina
+            if (_audioService != null && _audioService.IsPlaying)
+            {
+                await _audioService.StopPlayingAsync();
+            }
+
             var alarmService = PlatformServiceLocator.AlarmService;
             await alarmService.StopCurrentAlarmAsync();
 

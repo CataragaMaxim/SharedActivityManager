@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SharedActivityManager.Abstracts.Platforms;
+using SharedActivityManager.Builders;
 using SharedActivityManager.Data;
 using SharedActivityManager.Enums;
 using SharedActivityManager.Factories;
@@ -97,7 +98,63 @@ namespace SharedActivityManager.ViewModels
             Task.Run(async () => await RestoreAlarmsAsync());
         }
 
+        [RelayCommand]
+        private async Task NavigateToShared()
+        {
+            await Shell.Current.GoToAsync("//sharedactivities"); // Sau Navigation.PushAsync(new SharedActivitiesPage())
+        }
 
+        // ViewModels/MainViewModel.cs
+        [RelayCommand]
+        private async Task TestNotificationBuilder()
+        {
+            try
+            {
+                System.Diagnostics.Debug.WriteLine("=== Testing Notification Builder ===");
+
+                var director = new NotificationDirector();
+                var builder = new NotificationBuilder();
+                director.Builder = builder;
+
+                director.BuildAlarmNotification("Test Alarm", "This is a test alarm", 999, "Default Alarm");
+                var alarmNotification = builder.GetNotification();
+
+                System.Diagnostics.Debug.WriteLine(alarmNotification.GetDescription());
+
+                director.BuildReminderNotification("Test Reminder", "Don't forget to test the builder!");
+                var reminderNotification = builder.GetNotification();
+
+                System.Diagnostics.Debug.WriteLine(reminderNotification.GetDescription());
+
+                // Construcție personalizată
+                builder.SetTitle("Custom Notification");
+                builder.SetContent("This is a custom notification");
+                builder.SetPriority(AppNotificationPriority.High);
+                builder.SetVibration(new long[] { 0, 200, 100, 200 });
+                builder.AddButton("OK", "ok_action", 0);
+                builder.SetTimeout(TimeSpan.FromSeconds(5));
+
+                var customNotification = builder.GetNotification();
+                System.Diagnostics.Debug.WriteLine(customNotification.GetDescription());
+
+                // 🔥 FIX: Folosește Application.Current.MainPage în loc de DisplayAlert direct
+                var currentPage = Application.Current?.MainPage;
+                if (currentPage != null)
+                {
+                    await currentPage.DisplayAlert("Success", "Notification builder test completed! Check output window for details.", "OK");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error testing notification builder: {ex.Message}");
+
+                var currentPage = Application.Current?.MainPage;
+                if (currentPage != null)
+                {
+                    await currentPage.DisplayAlert("Error", $"Test failed: {ex.Message}", "OK");
+                }
+            }
+        }
 
         // Restaurează alarmele la pornire
         private async Task RestoreAlarmsAsync()

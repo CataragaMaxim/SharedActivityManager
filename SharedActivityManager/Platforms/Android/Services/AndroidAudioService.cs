@@ -161,38 +161,47 @@ namespace SharedActivityManager.Platforms.Android.Services
 
                 string filePath = null;
 
-                // 1. Verifică dacă e un ID default (default1, default2, default3)
+                // Verifică dacă e ton default
                 if (ringtoneIdentifier.StartsWith("default") ||
-                    (ringtoneIdentifier.Length == 1 && char.IsDigit(ringtoneIdentifier[0])))
+                    ringtoneIdentifier == "default1" ||
+                    ringtoneIdentifier == "default2" ||
+                    ringtoneIdentifier == "default3")
                 {
                     filePath = await GetDefaultRingtonePath(ringtoneIdentifier);
                 }
-                // 2. Verifică dacă e o cale completă (content:// sau file://)
-                else if (ringtoneIdentifier.StartsWith("content://") || ringtoneIdentifier.StartsWith("file://"))
-                {
-                    // Pentru tonuri de sistem, putem folosi direct RingtoneManager
-                    try
-                    {
-                        var ringtone = RingtoneManager.GetRingtone(AndroidApp.Context, AndroidUri.Parse(ringtoneIdentifier));
-                        if (ringtone != null)
-                        {
-                            ringtone.Play();
-                            IsPlaying = true;
-                            return true;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"AndroidAudioService: Error playing system ringtone: {ex.Message}");
-                    }
-                }
                 else
                 {
-                    // 3. Caută în folderul aplicației
-                    filePath = await FindRingtoneFile(ringtoneIdentifier);
+                    var ringtonesFolder = Path.Combine(FileSystem.AppDataDirectory, "Ringtones");
+
+                    // Caută fișierul indiferent de extensie
+                    var possiblePath = Path.Combine(ringtonesFolder, ringtoneIdentifier);
+
+                    if (File.Exists(possiblePath))
+                    {
+                        filePath = possiblePath;
+                    }
+                    else
+                    {
+                        // Caută după nume fără extensie
+                        string fileNameWithoutExt = Path.GetFileNameWithoutExtension(ringtoneIdentifier);
+                        var files = Directory.GetFiles(ringtonesFolder, "*.*");
+
+                        foreach (var file in files)
+                        {
+                            string currentFileName = Path.GetFileName(file);
+                            string currentNameWithoutExt = Path.GetFileNameWithoutExtension(file);
+
+                            if (currentFileName.Equals(ringtoneIdentifier, StringComparison.OrdinalIgnoreCase) ||
+                                currentNameWithoutExt.Equals(fileNameWithoutExt, StringComparison.OrdinalIgnoreCase) ||
+                                currentNameWithoutExt.Contains(fileNameWithoutExt))
+                            {
+                                filePath = file;
+                                break;
+                            }
+                        }
+                    }
                 }
 
-                // Redă folosind MediaPlayer dacă avem o cale validă
                 if (filePath != null && File.Exists(filePath))
                 {
                     System.Diagnostics.Debug.WriteLine($"Playing file: {filePath}");
@@ -210,7 +219,7 @@ namespace SharedActivityManager.Platforms.Android.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"AndroidAudioService: Error playing: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error playing: {ex.Message}");
                 return false;
             }
         }

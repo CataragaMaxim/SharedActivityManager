@@ -10,6 +10,14 @@
     <Grid RowDefinitions="Auto,*">
 
         <VerticalStackLayout Grid.Row="0" Padding="20" Spacing="15">
+            <!-- MainPage.xaml - adaugă în zona de sus, lângă butonul de creare -->
+            <Button Grid.Column="2"
+                    Text="👥 Shared"
+                    BackgroundColor="#9C27B0"
+                    TextColor="White"
+                    CornerRadius="8"
+                    Padding="15,10"
+                    Command="{Binding NavigateToSharedCommand}"/>
             <Label Text="Activity List"
                    FontSize="28"
                    FontAttributes="Bold"

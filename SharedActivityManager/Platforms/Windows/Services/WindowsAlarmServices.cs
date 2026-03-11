@@ -273,6 +273,11 @@ namespace SharedActivityManager.Platforms.Windows.Services
                 System.Diagnostics.Debug.WriteLine($"WindowsAlarmService: Error stopping alarm: {ex.Message}");
             }
         }
+
+        public Task ScheduleReminderAsync(Activity activity)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
 #endif
