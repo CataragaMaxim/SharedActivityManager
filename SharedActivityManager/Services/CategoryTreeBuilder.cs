@@ -14,93 +14,76 @@ namespace SharedActivityManager.Services
             _activityService = activityService;
         }
 
+        // Services/CategoryTreeBuilder.cs - metoda BuildFromDatabaseAsync
+
         public async Task<ActivityCategory> BuildFromDatabaseAsync()
         {
-            // Obține toate categoriile și activitățile
+            // Obține categoriile și activitățile
             var categories = await _activityService.GetCategoriesAsync();
             var activities = await _activityService.GetActivitiesAsync();
 
+            // 🔥 ELIMINĂ DUBLICATELE DIN CATEGORII
+            var uniqueCategories = categories
+                .GroupBy(c => c.Id)
+                .Select(g => g.First())
+                .ToList();
+
             System.Diagnostics.Debug.WriteLine($"=== Building Category Tree ===");
-            System.Diagnostics.Debug.WriteLine($"Categories found: {categories.Count}");
-            System.Diagnostics.Debug.WriteLine($"Activities found: {activities.Count}");
+            System.Diagnostics.Debug.WriteLine($"Original categories: {categories.Count}");
+            System.Diagnostics.Debug.WriteLine($"Unique categories: {uniqueCategories.Count}");
+            System.Diagnostics.Debug.WriteLine($"Activities: {activities.Count}");
 
-            // Creează un dicționar pentru categoriile principale
+            // Creează dicționar pentru categorii unice
             var categoryDict = new Dictionary<int, ActivityCategory>();
-
-            // Creează categoria rădăcină
             var root = new ActivityCategory(new Category { Id = 0, Name = "All Activities" });
 
-            // 🔥 Creează toate categoriile
-            foreach (var cat in categories)
+            // 🔥 CREEAREA CATEGORIILOR (doar cele unice)
+            foreach (var cat in uniqueCategories)
             {
-                categoryDict[cat.Id] = new ActivityCategory(cat);
-                System.Diagnostics.Debug.WriteLine($"Created category: ID={cat.Id}, Name={cat.Name}");
+                if (!categoryDict.ContainsKey(cat.Id))
+                {
+                    categoryDict[cat.Id] = new ActivityCategory(cat);
+                    System.Diagnostics.Debug.WriteLine($"Added category: ID={cat.Id}, Name={cat.Name}");
+                }
             }
 
-            // 🔥 Adaugă activitățile la categoriile lor
-            int activitiesWithCategory = 0;
-            int activitiesWithoutCategory = 0;
-
+            // 🔥 ADĂUGĂ ACTIVITĂȚILE (evită duplicate)
             foreach (var activity in activities)
             {
-                System.Diagnostics.Debug.WriteLine($"Processing activity: '{activity.Title}', TypeId={activity.TypeId}, CategoryId={activity.CategoryId}");
-
                 if (activity.CategoryId > 0 && categoryDict.ContainsKey(activity.CategoryId))
                 {
-                    categoryDict[activity.CategoryId].Add(new ActivityLeaf(activity));
-                    activitiesWithCategory++;
-                    System.Diagnostics.Debug.WriteLine($"  → Added to category ID={activity.CategoryId}");
-                }
-                else
-                {
-                    // 🔥 Dacă activitatea nu are categorie, încearcă să o categorizeze după tip
-                    activitiesWithoutCategory++;
-                    System.Diagnostics.Debug.WriteLine($"  → No category found! Attempting to assign by type...");
-
-                    var defaultCategory = await GetOrCreateCategoryByTypeAsync(activity.TypeId);
-                    if (defaultCategory != null)
+                    // Verifică dacă activitatea nu există deja
+                    var existingActivities = categoryDict[activity.CategoryId].GetAllActivities();
+                    if (!existingActivities.Any(a => a.Id == activity.Id))
                     {
-                        activity.CategoryId = defaultCategory.Id;
-                        await _activityService.SaveActivityAsync(activity);
-
-                        if (categoryDict.ContainsKey(defaultCategory.Id))
-                        {
-                            categoryDict[defaultCategory.Id].Add(new ActivityLeaf(activity));
-                            System.Diagnostics.Debug.WriteLine($"  → Auto-assigned to category '{defaultCategory.Name}' (ID={defaultCategory.Id})");
-                        }
+                        categoryDict[activity.CategoryId].Add(new ActivityLeaf(activity));
+                        System.Diagnostics.Debug.WriteLine($"Added activity '{activity.Title}' to category ID={activity.CategoryId}");
                     }
                 }
             }
 
-            System.Diagnostics.Debug.WriteLine($"Activities with category: {activitiesWithCategory}");
-            System.Diagnostics.Debug.WriteLine($"Activities without category: {activitiesWithoutCategory}");
+            // 🔥 CONSTRUIEȘTE IERARHIA (doar relații unice)
+            var processedRelations = new HashSet<string>();
 
-            // 🔥 Construiește ierarhia (părinte-copil)
-            foreach (var cat in categories)
+            foreach (var cat in uniqueCategories)
             {
                 if (cat.ParentCategoryId == 0)
                 {
-                    if (categoryDict.ContainsKey(cat.Id))
+                    if (categoryDict.ContainsKey(cat.Id) && !root.GetChildren().Any(c => c.Id == cat.Id.ToString()))
                     {
                         root.Add(categoryDict[cat.Id]);
-                        System.Diagnostics.Debug.WriteLine($"Added root category: {cat.Name}");
                     }
                 }
                 else if (categoryDict.ContainsKey(cat.ParentCategoryId) && categoryDict.ContainsKey(cat.Id))
                 {
-                    categoryDict[cat.ParentCategoryId].Add(categoryDict[cat.Id]);
-                    System.Diagnostics.Debug.WriteLine($"Added subcategory: {cat.Name} under parent ID={cat.ParentCategoryId}");
+                    var relationKey = $"{cat.ParentCategoryId}_{cat.Id}";
+                    if (!processedRelations.Contains(relationKey))
+                    {
+                        processedRelations.Add(relationKey);
+                        categoryDict[cat.ParentCategoryId].Add(categoryDict[cat.Id]);
+                    }
                 }
             }
-
-            // 🔥 Asigură-te că toate categoriile implicite există
-            await EnsureDefaultCategoriesExist(root, categoryDict);
-
-            System.Diagnostics.Debug.WriteLine($"=== Category Tree Built ===");
-            System.Diagnostics.Debug.WriteLine($"Root has {root.GetChildren().Count} direct children");
-
-            // Afișează structura
-            DisplayTree(root);
 
             return root;
         }

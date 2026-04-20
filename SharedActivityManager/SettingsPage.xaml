@@ -2,11 +2,103 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="SharedActivityManager.SettingsPage"
-             Title="SettingsPage">
-    <VerticalStackLayout>
-        <Label 
-            Text="Welcome to .NET MAUI!"
-            VerticalOptions="Center" 
-            HorizontalOptions="Center" />
-    </VerticalStackLayout>
+             Title="Settings">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="20">
+
+            <!-- Header -->
+            <Label Text="⚙️ Settings"
+                   FontSize="28"
+                   FontAttributes="Bold"
+                   TextColor="#2196F3"
+                   HorizontalOptions="Center"/>
+
+            <!-- Secțiunea General -->
+            <Border Stroke="#E0E0E0"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 10"
+                    Padding="15">
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="General"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           TextColor="#333333"/>
+
+                    <!-- Ringtone Selection -->
+                    <Grid ColumnDefinitions="*, Auto">
+                        <Label Grid.Column="0" 
+                               Text="Default Ringtone" 
+                               VerticalOptions="Center"/>
+                        <Button Grid.Column="1"
+                                Text="{Binding SelectedRingtone}"
+                                Clicked="OnSelectRingtoneClicked"
+                                BackgroundColor="#2196F3"
+                                TextColor="White"
+                                CornerRadius="8"/>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Secțiunea Data Management -->
+            <Border Stroke="#E0E0E0"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 10"
+                    Padding="15">
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="📁 Data Management"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           TextColor="#333333"/>
+
+                    <Label Text="⚠️ These actions cannot be undone!"
+                           FontSize="12"
+                           TextColor="#F44336"/>
+
+                    <!-- 🔥 BUTON ȘTERGE TOATE ACTIVITĂȚILE -->
+                    <Button Text="🗑️ Delete All Activities"
+                            Clicked="OnDeleteAllActivitiesClicked"
+                            BackgroundColor="#F44336"
+                            TextColor="White"
+                            CornerRadius="8"
+                            HeightRequest="50"/>
+
+                    <!-- Buton Reset Complete -->
+                    <Button Text="⚠️ Reset Everything (Categories + Activities)"
+                            Clicked="OnResetEverythingClicked"
+                            BackgroundColor="#D32F2F"
+                            TextColor="White"
+                            CornerRadius="8"
+                            HeightRequest="50"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Secțiunea About -->
+            <Border Stroke="#E0E0E0"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 10"
+                    Padding="15">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="ℹ️ About"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           TextColor="#333333"/>
+
+                    <Label Text="Shared Activity Manager"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"/>
+                    <Label Text="Version 1.0"
+                           FontSize="14"
+                           TextColor="#666666"
+                           HorizontalOptions="Center"/>
+                    <Label Text="Manage your activities efficiently"
+                           FontSize="12"
+                           TextColor="#999999"
+                           HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>

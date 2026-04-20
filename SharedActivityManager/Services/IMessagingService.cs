@@ -65,7 +65,8 @@ namespace SharedActivityManager.Services
     // Mesaje
     public class ActivitiesChangedMessage
     {
-        public string Action { get; set; } // "Added", "Updated", "Deleted", "Copied"
+        public string Action { get; set; } // "Added", "Updated", "Deleted", "Copied", "DeletedAll", "ResetEverything", "Imported"
         public Activity Activity { get; set; }
+        public int ActivityCount { get; set; }
     }
 }

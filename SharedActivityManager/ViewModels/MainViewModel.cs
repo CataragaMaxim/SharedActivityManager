@@ -122,9 +122,10 @@ namespace SharedActivityManager.ViewModels
             Task.Run(async () => await RestoreAlarmsAsync());
         }
 
+
         private async void OnActivitiesChanged(ActivitiesChangedMessage message)
         {
-            System.Diagnostics.Debug.WriteLine($"ActivitiesChanged: {message.Action}");
+            System.Diagnostics.Debug.WriteLine($"MainViewModel: ActivitiesChanged received - Action: {message.Action}");
 
             await MainThread.InvokeOnMainThreadAsync(async () =>
             {

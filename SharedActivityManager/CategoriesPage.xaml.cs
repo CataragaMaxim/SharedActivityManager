@@ -1,5 +1,4 @@
-﻿// CategoriesPage.xaml.cs
-using SharedActivityManager.ViewModels;
+﻿using SharedActivityManager.ViewModels;
 using SharedActivityManager.Models;
 
 namespace SharedActivityManager
@@ -28,7 +27,6 @@ namespace SharedActivityManager
             }
         }
 
-        // 🔥 METODĂ NOUĂ PENTRU BUTONUL EXPAND
         private async void OnExpandButtonClicked(object sender, EventArgs e)
         {
             try
@@ -50,6 +48,9 @@ namespace SharedActivityManager
         protected override void OnAppearing()
         {
             base.OnAppearing();
+            System.Diagnostics.Debug.WriteLine("CategoriesPage: OnAppearing - forcing refresh");
+
+            // 🔥 FORȚEAZĂ REFRESH COMPLET
             _viewModel.RefreshCommand.Execute(null);
         }
     }

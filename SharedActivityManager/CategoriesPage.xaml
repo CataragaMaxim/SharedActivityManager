@@ -50,29 +50,15 @@
 
         <!-- Butoane acțiune -->
         <HorizontalStackLayout Grid.Row="2" Margin="15,5" Spacing="10">
-            <Button Text="+ New Category" 
-                    Command="{Binding ShowCreateCategoryDialogCommand}"
-                    BackgroundColor="#4CAF50" 
-                    TextColor="White"
-                    CornerRadius="8"
-                    HeightRequest="40"
-                    HorizontalOptions="Start"/>
+            <!-- Butoanele existente -->
+            <Button Text="+ New Category" Command="{Binding ShowCreateCategoryDialogCommand}" BackgroundColor="#4CAF50" TextColor="White" CornerRadius="8" HeightRequest="40"/>
+            <Button Text="📤 Export" Command="{Binding ExportCommand}" BackgroundColor="#2196F3" TextColor="White" CornerRadius="8" HeightRequest="40"/>
+            <Button Text="📥 Import" Command="{Binding ImportCommand}" BackgroundColor="#FF9800" TextColor="White" CornerRadius="8" HeightRequest="40"/>
 
-            <Button Text="📤 Export" 
-                    Command="{Binding ExportCommand}"
-                    BackgroundColor="#2196F3" 
-                    TextColor="White"
-                    CornerRadius="8"
-                    HeightRequest="40"
-                    HorizontalOptions="Start"/>
-
-            <Button Text="📥 Import" 
-                    Command="{Binding ImportCommand}"
-                    BackgroundColor="#FF9800" 
-                    TextColor="White"
-                    CornerRadius="8"
-                    HeightRequest="40"
-                    HorizontalOptions="Start"/>
+            <!-- 🔥 BUTOANE NOI PENTRU TEST -->
+            <Button Text="🧪 Test CSV" Command="{Binding TestCsvExportCommand}" BackgroundColor="#607D8B" TextColor="White" CornerRadius="8" HeightRequest="40"/>
+            <Button Text="🧪 Test JSON" Command="{Binding TestJsonExportCommand}" BackgroundColor="#607D8B" TextColor="White" CornerRadius="8" HeightRequest="40"/>
+            <Button Text="🧪 Test XML" Command="{Binding TestXmlExportCommand}" BackgroundColor="#607D8B" TextColor="White" CornerRadius="8" HeightRequest="40"/>
         </HorizontalStackLayout>
 
         <!-- Dialog pentru creare categorie -->

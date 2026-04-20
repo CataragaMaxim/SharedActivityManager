@@ -2,8 +2,10 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SharedActivityManager.Data;
+using SharedActivityManager.Enums;
 using SharedActivityManager.Models;
 using SharedActivityManager.Services;
+using SharedActivityManager.Services.Adapters;
 
 namespace SharedActivityManager.ViewModels
 {
@@ -13,6 +15,8 @@ namespace SharedActivityManager.ViewModels
         private readonly CategoryTreeBuilder _treeBuilder;
         private readonly CategoryExportService _exportService;
         private readonly IAlertService _alertService;
+        private readonly FileAdapterFacade _fileAdapter;
+        private readonly IMessagingService _messagingService;
 
         // Proprietăți principale
         [ObservableProperty]
@@ -61,9 +65,30 @@ namespace SharedActivityManager.ViewModels
             _treeBuilder = new CategoryTreeBuilder(_activityService);
             _exportService = new CategoryExportService(_activityService);
             _alertService = new AlertService();
+            _fileAdapter = new FileAdapterFacade();
+            _messagingService = new MessagingService();
+
+            // 🔥 ABONARE LA MESAJE GLOBALE
+            _messagingService.Subscribe<ActivitiesChangedMessage>(this, OnActivitiesChanged);
 
             LoadCategories();
             LoadExpandedState();
+        }
+
+        // 🔥 METODĂ PENTRU A REACȚIONA LA SCHIMBĂRI
+        private async void OnActivitiesChanged(ActivitiesChangedMessage message)
+        {
+            System.Diagnostics.Debug.WriteLine($"CategoriesViewModel: Received message - Action: {message.Action}");
+
+            await MainThread.InvokeOnMainThreadAsync(() =>
+            {
+                // Reîncarcă toate datele
+                LoadCategories();
+                RefreshDisplayTree();
+                UpdateStatistics();
+
+                System.Diagnostics.Debug.WriteLine($"CategoriesViewModel: Reloaded - Total activities: {TotalActivities}");
+            });
         }
 
         private async void LoadCategories()
@@ -126,7 +151,6 @@ namespace SharedActivityManager.ViewModels
             var completed = category.GetCompletedCount();
             var percent = total > 0 ? (double)completed / total * 100 : 0;
 
-            // 🔥 CORECTAT: IsComposite este proprietate, nu metodă
             var message = $"📁 {category.Name}\n" +
                          $"├─ Total activități: {total}\n" +
                          $"├─ Finalizate: {completed}\n" +
@@ -193,7 +217,6 @@ namespace SharedActivityManager.ViewModels
         [RelayCommand]
         private async Task DeleteCategory(ActivityComponent category)
         {
-            // 🔥 CORECTAT: IsComposite este proprietate
             if (category == null || !category.IsComposite) return;
 
             var confirm = await _alertService.ShowConfirmationAsync("Confirm Delete",
@@ -208,7 +231,6 @@ namespace SharedActivityManager.ViewModels
 
         // ========== EXPAND/COLLAPSE ==========
 
-        // În CategoriesViewModel.cs - verifică această metodă
         [RelayCommand]
         private void ToggleExpand(ActivityCategory category)
         {
@@ -255,7 +277,6 @@ namespace SharedActivityManager.ViewModels
         {
             collection.Add(component);
 
-            // 🔥 CORECTAT: IsComposite este proprietate
             if (component.IsComposite && _expandedState.ContainsKey(component.CategoryId) && _expandedState[component.CategoryId])
             {
                 foreach (var child in component.GetChildren())
@@ -309,7 +330,6 @@ namespace SharedActivityManager.ViewModels
             if (component.Name.ToLower().Contains(searchText))
                 results.Add(component);
 
-            // 🔥 CORECTAT: IsComposite este proprietate
             if (component.IsComposite)
             {
                 foreach (var child in component.GetChildren())
@@ -322,25 +342,26 @@ namespace SharedActivityManager.ViewModels
         // ========== EXPORT/IMPORT ==========
 
         [RelayCommand]
-        private async Task Export()
+        private async Task ExportToFile()
         {
             try
             {
-                var json = await _exportService.ExportToJsonAsync(RootCategory);
-
-                // Salvează fișierul
-                var fileName = $"categories_export_{DateTime.Now:yyyyMMdd_HHmmss}.json";
-                var filePath = Path.Combine(FileSystem.CacheDirectory, fileName);
-                await File.WriteAllTextAsync(filePath, json);
-
-                // Share fișierul
-                await Share.Default.RequestAsync(new ShareFileRequest
+                var result = await FilePicker.PickAsync(new PickOptions
                 {
-                    Title = "Export Categories",
-                    File = new ShareFile(filePath)
+                    PickerTitle = "Select export location",
+                    FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+                    {
+                        { DevicePlatform.WinUI, new[] { ".json", ".csv", ".xml" } },
+                        { DevicePlatform.Android, new[] { "application/json", "text/csv", "application/xml" } }
+                    })
                 });
 
-                await _alertService.ShowAlertAsync("Success", $"Exported to {fileName}");
+                if (result != null)
+                {
+                    var allActivities = RootCategory?.GetAllActivities() ?? new List<Activity>();
+                    await _fileAdapter.ExportToFileAsync(result.FullPath, allActivities);
+                    await _alertService.ShowAlertAsync("Success", $"Exported {allActivities.Count} activities to {result.FileName}");
+                }
             }
             catch (Exception ex)
             {
@@ -355,23 +376,45 @@ namespace SharedActivityManager.ViewModels
             {
                 var result = await FilePicker.PickAsync(new PickOptions
                 {
-                    PickerTitle = "Select JSON file to import",
+                    PickerTitle = "Select file to import",
                     FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
                     {
-                        { DevicePlatform.WinUI, new[] { ".json" } },
-                        { DevicePlatform.Android, new[] { "application/json" } }
+                        { DevicePlatform.WinUI, new[] { ".json", ".csv", ".xml", ".txt" } },
+                        { DevicePlatform.Android, new[] { "application/json", "text/csv", "application/xml" } }
                     })
                 });
 
                 if (result != null)
                 {
-                    var json = await File.ReadAllTextAsync(result.FullPath);
-                    var imported = await _exportService.ImportFromJsonAsync(json);
+                    var (activities, preview) = await _fileAdapter.ImportWithPreviewAsync(result.FullPath);
 
-                    // Reîncarcă structura
-                    LoadCategories();
+                    var confirm = await _alertService.ShowConfirmationAsync("Import Preview",
+                        $"{preview}\n\nDo you want to import these activities?");
 
-                    await _alertService.ShowAlertAsync("Success", "Categories imported successfully!");
+                    if (confirm)
+                    {
+                        foreach (var activity in activities)
+                        {
+                            activity.CategoryId = RootCategory?.CategoryId ?? 0;
+                            await _activityService.SaveActivityAsync(activity);
+                        }
+
+                        // Reîncarcă local
+                        await MainThread.InvokeOnMainThreadAsync(() =>
+                        {
+                            LoadCategories();
+                            RefreshDisplayTree();
+                        });
+
+                        // Notifică MainPage
+                        _messagingService.Send(new ActivitiesChangedMessage
+                        {
+                            Action = "Imported",
+                            ActivityCount = activities.Count
+                        });
+
+                        await _alertService.ShowAlertAsync("Success", $"Imported {activities.Count} activities");
+                    }
                 }
             }
             catch (Exception ex)
@@ -429,7 +472,8 @@ namespace SharedActivityManager.ViewModels
             }
         }
 
-        // CategoriesViewModel.cs - adaugă această metodă temporară pentru debug
+        // ========== METODE DE TEST ==========
+
         [RelayCommand]
         private async Task DebugCategories()
         {
@@ -449,6 +493,146 @@ namespace SharedActivityManager.ViewModels
             }
 
             await _alertService.ShowAlertAsync("Debug Info", debugInfo);
+        }
+
+        [RelayCommand]
+        private async Task TestCsvExport()
+        {
+            try
+            {
+                var testActivities = new List<Activity>
+                {
+                    new Activity
+                    {
+                        Title = "Test Activity 1",
+                        Desc = "Description 1",
+                        TypeId = ActivityType.Work,
+                        StartDate = DateTime.Today,
+                        StartTime = DateTime.Now,
+                        IsCompleted = false,
+                        AlarmSet = true,
+                        IsPublic = false
+                    },
+                    new Activity
+                    {
+                        Title = "Test Activity 2",
+                        Desc = "Description 2",
+                        TypeId = ActivityType.Health,
+                        StartDate = DateTime.Today.AddDays(1),
+                        StartTime = DateTime.Now.AddHours(1),
+                        IsCompleted = true,
+                        AlarmSet = false,
+                        IsPublic = true
+                    }
+                };
+
+                var filePath = Path.Combine(FileSystem.CacheDirectory, "test_export.csv");
+                await _fileAdapter.ExportToFileAsync(filePath, testActivities);
+
+                var imported = await _fileAdapter.ImportFromFileAsync(filePath);
+
+                var message = $"✅ CSV Test Results:\n" +
+                              $"Exported: {testActivities.Count} activities\n" +
+                              $"Imported: {imported.Count} activities\n\n" +
+                              $"File saved: {filePath}";
+
+                await _alertService.ShowAlertAsync("CSV Test", message);
+
+                await Launcher.Default.OpenAsync(new OpenFileRequest
+                {
+                    File = new ReadOnlyFile(filePath)
+                });
+            }
+            catch (Exception ex)
+            {
+                await _alertService.ShowAlertAsync("CSV Test Failed", ex.Message);
+            }
+        }
+
+        [RelayCommand]
+        private async Task TestJsonExport()
+        {
+            try
+            {
+                var testActivities = new List<Activity>
+                {
+                    new Activity
+                    {
+                        Title = "Test JSON 1",
+                        Desc = "JSON Description",
+                        TypeId = ActivityType.Study,
+                        StartDate = DateTime.Today,
+                        StartTime = DateTime.Now,
+                        IsCompleted = false,
+                        AlarmSet = true,
+                        IsPublic = false
+                    }
+                };
+
+                var filePath = Path.Combine(FileSystem.CacheDirectory, "test_export.json");
+                await _fileAdapter.ExportToFileAsync(filePath, testActivities);
+
+                var imported = await _fileAdapter.ImportFromFileAsync(filePath);
+
+                var message = $"✅ JSON Test Results:\n" +
+                              $"Exported: {testActivities.Count} activities\n" +
+                              $"Imported: {imported.Count} activities\n\n" +
+                              $"File saved: {filePath}";
+
+                await _alertService.ShowAlertAsync("JSON Test", message);
+
+                await Launcher.Default.OpenAsync(new OpenFileRequest
+                {
+                    File = new ReadOnlyFile(filePath)
+                });
+            }
+            catch (Exception ex)
+            {
+                await _alertService.ShowAlertAsync("JSON Test Failed", ex.Message);
+            }
+        }
+
+        [RelayCommand]
+        private async Task TestXmlExport()
+        {
+            try
+            {
+                var testActivities = new List<Activity>
+                {
+                    new Activity
+                    {
+                        Title = "Test XML 1",
+                        Desc = "XML Description",
+                        TypeId = ActivityType.Personal,
+                        StartDate = DateTime.Today,
+                        StartTime = DateTime.Now,
+                        IsCompleted = true,
+                        AlarmSet = false,
+                        IsPublic = true
+                    }
+                };
+
+                var filePath = Path.Combine(FileSystem.CacheDirectory, "test_export.xml");
+                await _fileAdapter.ExportToFileAsync(filePath, testActivities);
+
+                var imported = await _fileAdapter.ImportFromFileAsync(filePath);
+
+                var message = $"✅ XML Test Results:\n" +
+                              $"Exported: {testActivities.Count} activities\n" +
+                              $"Imported: {imported.Count} activities\n\n" +
+                              $"File saved: {filePath}";
+
+                await _alertService.ShowAlertAsync("XML Test", message);
+
+                await Launcher.Default.OpenAsync(new OpenFileRequest
+                {
+                    File = new ReadOnlyFile(filePath)
+                });
+            }
+            catch (Exception ex)
+            {
+                await _alertService.ShowAlertAsync("XML Test Failed", ex.Message);
+            }
         }
     }
 }

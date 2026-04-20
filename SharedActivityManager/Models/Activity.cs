@@ -1,5 +1,6 @@
 ﻿// Models/Activity.cs (versiunea corectată)
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using SharedActivityManager.Abstracts;
 using SharedActivityManager.Enums;
 using SQLite;
@@ -19,6 +20,8 @@ namespace SharedActivityManager.Models
 
         // 🔥 FIX: Adaugă ambele forme pentru compatibilitate
         private bool _isCompleted;
+
+        [JsonPropertyName("isCompleted")]
         public bool IsCompleted
         {
             get => _isCompleted;
@@ -26,11 +29,18 @@ namespace SharedActivityManager.Models
         }
 
         // Proprietate pentru compatibilitate cu codul existent
-        [Ignore]
+        [JsonIgnore]
         public bool isCompleted
         {
             get => IsCompleted;
             set => IsCompleted = value;
+        }
+
+        [JsonIgnore]
+        public ReminderType ReminderTypeId
+        {
+            get => ReminderType;
+            set => ReminderType = value;
         }
 
         public string RingTone { get; set; }
@@ -54,14 +64,6 @@ namespace SharedActivityManager.Models
         {
             get => (ReminderType)ReminderTypeValue;
             set => ReminderTypeValue = (int)value;
-        }
-
-        // Proprietate pentru compatibilitate
-        [Ignore]
-        public ReminderType ReminderTypeId
-        {
-            get => ReminderType;
-            set => ReminderType = value;
         }
 
         // JSON cu date suplimentare
