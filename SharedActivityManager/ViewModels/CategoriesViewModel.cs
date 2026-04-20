@@ -428,5 +428,27 @@ namespace SharedActivityManager.ViewModels
                 await _alertService.ShowAlertAsync("Success", "All activities marked as completed!");
             }
         }
+
+        // CategoriesViewModel.cs - adaugă această metodă temporară pentru debug
+        [RelayCommand]
+        private async Task DebugCategories()
+        {
+            var categories = await _activityService.GetCategoriesAsync();
+            var activities = await _activityService.GetActivitiesAsync();
+
+            var debugInfo = "=== CATEGORIES ===\n";
+            foreach (var cat in categories)
+            {
+                debugInfo += $"ID: {cat.Id}, Name: {cat.Name}, ParentId: {cat.ParentCategoryId}\n";
+            }
+
+            debugInfo += "\n=== ACTIVITIES ===\n";
+            foreach (var act in activities)
+            {
+                debugInfo += $"Title: {act.Title}, Type: {act.TypeId}, CategoryId: {act.CategoryId}\n";
+            }
+
+            await _alertService.ShowAlertAsync("Debug Info", debugInfo);
+        }
     }
 }

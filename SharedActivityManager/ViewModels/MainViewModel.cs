@@ -14,17 +14,17 @@ namespace SharedActivityManager.ViewModels
     public partial class MainViewModel : ObservableObject
     {
         // ========== SERVICII ==========
+        private readonly IActivityManagementFacade _activityFacade;
         private readonly IActivityService _activityService;
         private readonly IAudioService _audioService;
         private readonly IAlarmService _alarmService;
         private readonly IAlertService _alertService;
         private readonly IMessagingService _messagingService;
 
-        // ========== PROPRIETĂȚI PENTRU COLECȚII ==========
+        // ========== PROPRIETĂȚI ==========
         [ObservableProperty]
         private ObservableCollection<Activity> activities = new();
 
-        // ========== TOATE PROPRIETĂȚILE PENTRU FORMULAR ==========
         [ObservableProperty]
         private string newTaskTitle;
 
@@ -89,20 +89,32 @@ namespace SharedActivityManager.ViewModels
         // ========== CONSTRUCTOR ==========
         public MainViewModel()
         {
-            // Inițializare servicii
-            _activityService = new ActivityService(new ActivityRepository());
-            _alarmService = PlatformServiceLocator.AlarmService;
-            _audioService = PlatformServiceLocator.AudioService;
-            _alertService = new AlertService();
-            _messagingService = new MessagingService();
+            // 🔥 Inițializare servicii
+            var repository = new ActivityRepository();
+            var activityService = new ActivityService(repository);
+            var alarmService = PlatformServiceLocator.AlarmService;
+            var audioService = PlatformServiceLocator.AudioService;
+            var notificationService = PlatformServiceLocator.NotificationService;
+            var alertService = new AlertService();
+            var messagingService = new MessagingService();
+
+            // 🔥 IMPORTANT: Inițializează toate câmpurile
+            _activityService = activityService;  // ← ASTA LIPSEA!
+            _audioService = audioService;
+            _alarmService = alarmService;
+            _alertService = alertService;
+            _messagingService = messagingService;
+
+            // Inițializare Facade
+            _activityFacade = new ActivityManagementFacade(
+                activityService, alarmService, audioService,
+                notificationService, alertService, messagingService);
 
             // Abonare la mesaje
             _messagingService.Subscribe<ActivitiesChangedMessage>(this, OnActivitiesChanged);
 
-            // Încărcare date inițiale
+            // Încărcare date
             Task.Run(async () => await LoadActivitiesAsync()).Wait();
-
-            // Încărcare setări
             LoadSavedRingtone();
             UpdateNextReminderPreview();
 
@@ -114,7 +126,6 @@ namespace SharedActivityManager.ViewModels
         {
             System.Diagnostics.Debug.WriteLine($"ActivitiesChanged: {message.Action}");
 
-            // Reîncarcă activitățile pe UI thread
             await MainThread.InvokeOnMainThreadAsync(async () =>
             {
                 await LoadActivitiesAsync();
@@ -122,25 +133,10 @@ namespace SharedActivityManager.ViewModels
         }
 
         // ========== PARTIAL METHODS ==========
-        partial void OnSelectedStartDateChanged(DateTime value)
-        {
-            UpdateNextReminderPreview();
-        }
-
-        partial void OnSelectedStartTimeChanged(TimeSpan value)
-        {
-            UpdateNextReminderPreview();
-        }
-
-        partial void OnAlarmSetChanged(bool value)
-        {
-            UpdateNextReminderPreview();
-        }
-
-        partial void OnSelectedReminderTypeChanged(ReminderType value)
-        {
-            UpdateNextReminderPreview();
-        }
+        partial void OnSelectedStartDateChanged(DateTime value) => UpdateNextReminderPreview();
+        partial void OnSelectedStartTimeChanged(TimeSpan value) => UpdateNextReminderPreview();
+        partial void OnAlarmSetChanged(bool value) => UpdateNextReminderPreview();
+        partial void OnSelectedReminderTypeChanged(ReminderType value) => UpdateNextReminderPreview();
 
         // ========== METODE PRIVATE ==========
         private async Task RestoreAlarmsAsync()
@@ -201,19 +197,19 @@ namespace SharedActivityManager.ViewModels
             await Shell.Current.GoToAsync("//sharedactivities");
         }
 
-        // ViewModels/MainViewModel.cs - adaugă această metodă dacă nu există
         [RelayCommand]
         public async Task LoadActivitiesAsync()
         {
             try
             {
                 System.Diagnostics.Debug.WriteLine("MainViewModel: Loading activities...");
+
+                // 🔥 Acum _activityService nu mai e null
                 var activitiesFromDb = await _activityService.GetActivitiesAsync();
                 Activities = new ObservableCollection<Activity>(activitiesFromDb.OrderBy(a => a.StartDate));
 
                 System.Diagnostics.Debug.WriteLine($"MainViewModel: Loaded {Activities.Count} activities");
 
-                // Afișează activitățile în debug
                 foreach (var a in Activities)
                 {
                     System.Diagnostics.Debug.WriteLine($"- {a.Title} (ID: {a.Id})");
@@ -237,32 +233,39 @@ namespace SharedActivityManager.ViewModels
 
             try
             {
-                // 🔥 OBȚINE SAU CREEAZĂ CATEGORIA CORESPUNZĂTOARE
-                int categoryId = await GetCategoryIdForActivityType(SelectedActivityType);
+                var additionalParams = new Dictionary<string, object>();
 
-                var newActivity = new Activity
+                switch (SelectedActivityType)
                 {
-                    Title = NewTaskTitle,
-                    Desc = NewTaskDesc ?? string.Empty,
-                    TypeId = SelectedActivityType,
-                    StartDate = SelectedStartDate,
-                    StartTime = CombinedStartDateTime,
-                    AlarmSet = AlarmSet,
-                    IsCompleted = false,
-                    ReminderType = SelectedReminderType,
-                    NextReminderDate = CalculateNextReminderDate(),
-                    RingTone = SelectedRingTone ?? "Default",
-                    IsPublic = IsPublic,
-                    OwnerId = "current_user",
-                    SharedDate = IsPublic ? DateTime.Now : default,
-                    CategoryId = categoryId  // 🔥 SETEAZĂ CATEGORIA
-                };
+                    case ActivityType.Work:
+                        additionalParams["Priority"] = "Medium";
+                        additionalParams["ProjectName"] = "General";
+                        break;
+                    case ActivityType.Health:
+                        additionalParams["DurationSeconds"] = 1800;
+                        additionalParams["WorkoutType"] = "General";
+                        break;
+                    case ActivityType.Study:
+                        additionalParams["Subject"] = "General";
+                        break;
+                    case ActivityType.Personal:
+                        additionalParams["Budget"] = 0m;
+                        break;
+                }
 
-                await _activityService.SaveActivityWithAlarmAsync(newActivity, _alarmService);
+                await _activityFacade.CreateCompleteActivityAsync(
+                    NewTaskTitle,
+                    NewTaskDesc ?? string.Empty,
+                    SelectedActivityType,
+                    CombinedStartDateTime,
+                    AlarmSet,
+                    SelectedReminderType,
+                    SelectedRingTone ?? "Default",
+                    IsPublic,
+                    additionalParams);
+
                 await LoadActivitiesAsync();
                 ResetForm();
-
-                await _alertService.ShowAlertAsync("Success", "Activity added successfully!");
             }
             catch (Exception ex)
             {
@@ -281,14 +284,12 @@ namespace SharedActivityManager.ViewModels
                 _ => "Other"
             };
 
-            // 🔥 FOLOSEȘTE SERVICE-UL, NU _database
             var categories = await _activityService.GetCategoriesAsync();
             var existing = categories.FirstOrDefault(c => c.Name == categoryName);
 
             if (existing != null)
                 return existing.Id;
 
-            // Creează categorie nouă dacă nu există
             var newCategory = new Category
             {
                 Name = categoryName,
@@ -305,10 +306,6 @@ namespace SharedActivityManager.ViewModels
             if (SelectedActivity == null) return;
 
             System.Diagnostics.Debug.WriteLine($"=== SaveEditedActivity START ===");
-            System.Diagnostics.Debug.WriteLine($"Activity ID: {SelectedActivity.Id}");
-            System.Diagnostics.Debug.WriteLine($"Activity Title: {SelectedActivity.Title}");
-            System.Diagnostics.Debug.WriteLine($"IsPublic (form): {IsPublic}");
-            System.Diagnostics.Debug.WriteLine($"Activity.IsPublic before: {SelectedActivity.IsPublic}");
 
             if (string.IsNullOrWhiteSpace(NewTaskTitle))
             {
@@ -318,11 +315,9 @@ namespace SharedActivityManager.ViewModels
 
             try
             {
-                // Anulează alarma veche
                 await _alarmService.CancelAlarmAsync(SelectedActivity.Id);
                 await Task.Delay(200);
 
-                // Update the activity with form values
                 SelectedActivity.Title = NewTaskTitle;
                 SelectedActivity.Desc = NewTaskDesc ?? string.Empty;
                 SelectedActivity.TypeId = SelectedActivityType;
@@ -332,15 +327,12 @@ namespace SharedActivityManager.ViewModels
                 SelectedActivity.ReminderType = SelectedReminderType;
                 SelectedActivity.NextReminderDate = CalculateNextReminderDate();
                 SelectedActivity.RingTone = SelectedRingTone ?? "Default";
-                SelectedActivity.IsPublic = IsPublic;  // ← IMPORTANT!
+                SelectedActivity.IsPublic = IsPublic;
 
-                // Dacă devine publică, actualizăm SharedDate
                 if (SelectedActivity.IsPublic && SelectedActivity.SharedDate == default)
                 {
                     SelectedActivity.SharedDate = DateTime.Now;
                 }
-
-                System.Diagnostics.Debug.WriteLine($"Activity.IsPublic after: {SelectedActivity.IsPublic}");
 
                 await _activityService.SaveActivityAsync(SelectedActivity);
 
@@ -351,8 +343,6 @@ namespace SharedActivityManager.ViewModels
 
                 await LoadActivitiesAsync();
                 await _alertService.ShowAlertAsync("Success", "Activity updated successfully!");
-
-                System.Diagnostics.Debug.WriteLine($"=== SaveEditedActivity END ===");
             }
             catch (Exception ex)
             {
@@ -361,10 +351,7 @@ namespace SharedActivityManager.ViewModels
             }
         }
 
-        public async Task AddNewActivity()
-        {
-            await AddActivity();
-        }
+        public async Task AddNewActivity() => await AddActivity();
 
         [RelayCommand]
         public async Task DeleteActivity(Activity activity)
@@ -373,8 +360,7 @@ namespace SharedActivityManager.ViewModels
 
             try
             {
-                await _alarmService.CancelAlarmAsync(activity.Id);
-                await _activityService.DeleteActivityAsync(activity);
+                await _activityFacade.DeleteCompleteActivityAsync(activity);
                 await LoadActivitiesAsync();
             }
             catch (Exception ex)
@@ -410,24 +396,16 @@ namespace SharedActivityManager.ViewModels
         {
             if (activity != null)
             {
-                activity.IsCompleted = !activity.IsCompleted;  // ← folosește IsCompleted
-
-                if (activity.IsCompleted)
+                if (!activity.IsCompleted)
                 {
-                    await _alarmService.CancelAlarmAsync(activity.Id);
+                    await _activityFacade.CompleteActivityAsync(activity);
                 }
-                else if (activity.AlarmSet)
+                else
                 {
-                    await _alarmService.ScheduleAlarmAsync(activity);
+                    await _activityFacade.ReactivateActivityAsync(activity);
                 }
 
-                await _activityService.SaveActivityAsync(activity);
-
-                var index = Activities.IndexOf(activity);
-                if (index >= 0)
-                {
-                    Activities[index] = activity;
-                }
+                await LoadActivitiesAsync();
             }
         }
 
@@ -442,7 +420,7 @@ namespace SharedActivityManager.ViewModels
             SelectedStartDate = activity.StartDate.Date;
             SelectedStartTime = activity.StartTime.TimeOfDay;
             AlarmSet = activity.AlarmSet;
-            SelectedReminderType = activity.ReminderType;  // ← folosește ReminderType
+            SelectedReminderType = activity.ReminderType;
             SelectedRingTone = activity.RingTone ?? "Default Alarm";
             IsPublic = activity.IsPublic;
 
@@ -494,8 +472,6 @@ namespace SharedActivityManager.ViewModels
         {
             if (activity == null) return;
 
-            var factory = Factories.ActivityFactoryRegistry.GetCreator(activity.TypeId);
-
             switch (activity.TypeId)
             {
                 case ActivityType.Health:
@@ -508,10 +484,7 @@ namespace SharedActivityManager.ViewModels
                     await Application.Current.MainPage.Navigation.PushAsync(studyPage);
                     break;
 
-                // Poți adăuga și pentru Shopping și Work
-
                 default:
-                    // Deschide modalul de editare existent
                     var modal = new ActivityModal(this, activity);
                     await Application.Current.MainPage.Navigation.PushModalAsync(modal);
                     break;
