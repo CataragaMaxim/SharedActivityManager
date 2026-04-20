@@ -34,6 +34,37 @@ namespace SharedActivityManager.Services
             await _repository.DeleteActivityAsync(activity);
         }
 
+        public async Task<List<Category>> GetCategoriesAsync()
+        {
+            return await _repository.GetCategoriesAsync();
+        }
+
+        public async Task<List<Category>> GetSubCategoriesAsync(int parentId)
+        {
+            return await _repository.GetSubCategoriesAsync(parentId);
+        }
+
+
+        public async Task<Category> GetCategoryByIdAsync(int id)
+        {
+            return await _repository.GetCategoryByIdAsync(id);
+        }
+
+        public async Task<int> SaveCategoryAsync(Category category)
+        {
+            return await _repository.SaveCategoryAsync(category);
+        }
+
+        public async Task<int> DeleteCategoryAsync(Category category)
+        {
+            return await _repository.DeleteCategoryAsync(category);
+        }
+
+        public async Task MoveActivityToCategoryAsync(int activityId, int newCategoryId)
+        {
+            await _repository.MoveActivityToCategoryAsync(activityId, newCategoryId);
+        }
+
         public async Task SaveActivityWithAlarmAsync(Activity activity, IAlarmService alarmService)
         {
             // Salvează activitatea

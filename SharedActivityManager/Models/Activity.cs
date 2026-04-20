@@ -123,5 +123,30 @@ namespace SharedActivityManager.Models
         public virtual bool RequiresPreparation() => false;
         public virtual string GetNotificationMessage() => $"⏰ {Title}";
         public virtual Dictionary<string, object> GetAdditionalProperties() => new();
+
+        public int CategoryId { get; set; } = 0;
+
+        // Date specifice pentru diferite tipuri (stocate ca JSON)
+        public string SpecificDataJson { get; set; }
+
+        // Pentru StudyActivity - Video
+        public string VideoUrl { get; set; }
+        public double VideoProgress { get; set; } // 0-100
+        public string Notes { get; set; }
+
+        // Pentru SportActivity - Timer
+        public int TimerDurationSeconds { get; set; } // Durata totală
+        public int TimerElapsedSeconds { get; set; } // Timp scurs
+        public bool IsTimerRunning { get; set; }
+
+        // Pentru ShoppingActivity - Listă
+        public string ShoppingItemsJson { get; set; } // JSON cu lista de produse
+        public decimal Budget { get; set; }
+        public string Store { get; set; }
+
+        // Pentru WorkActivity
+        public string Priority { get; set; } // Low, Medium, High
+        public string ProjectName { get; set; }
+        public DateTime? Deadline { get; set; }
     }
 }

@@ -34,6 +34,36 @@ namespace SharedActivityManager.Repositories
         {
             return await _database.DeleteActivityAsync(activity);
         }
+        public async Task<List<Category>> GetSubCategoriesAsync(int parentId)
+        {
+            return await _database.GetSubCategoriesAsync(parentId);
+        }
+
+        public async Task<List<Category>> GetCategoriesAsync()
+        {
+            return await _database.GetCategoriesAsync();
+        }
+
+        public async Task<Category> GetCategoryByIdAsync(int id)
+        {
+            var categories = await _database.GetCategoriesAsync();
+            return categories.FirstOrDefault(c => c.Id == id);
+        }
+
+        public async Task<int> SaveCategoryAsync(Category category)
+        {
+            return await _database.SaveCategoryAsync(category);
+        }
+
+        public async Task<int> DeleteCategoryAsync(Category category)
+        {
+            return await _database.DeleteCategoryAsync(category);
+        }
+
+        public async Task MoveActivityToCategoryAsync(int activityId, int newCategoryId)
+        {
+            await _database.MoveActivityToCategoryAsync(activityId, newCategoryId);
+        }
 
         public async Task<List<Activity>> GetPublicActivitiesAsync(string excludeUserId)
         {

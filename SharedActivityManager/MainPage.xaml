@@ -7,52 +7,69 @@
              x:DataType="viewmodels:MainViewModel"
              Title="Activity List">
 
-    <Grid RowDefinitions="Auto,*">
+    <Grid RowDefinitions="Auto,Auto,*">
 
-        <VerticalStackLayout Grid.Row="0" Padding="20" Spacing="15">
+        <!-- Header cu butoane -->
+        <VerticalStackLayout Grid.Row="0" Padding="20" Spacing="10">
             <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="10">
                 <Label Grid.Column="0" 
-               Text="Activity List"
-               FontSize="28"
-               FontAttributes="Bold"
-               TextColor="#2196F3"
-               VerticalOptions="Center"/>
+                       Text="Activity List"
+                       FontSize="28"
+                       FontAttributes="Bold"
+                       TextColor="#2196F3"
+                       VerticalOptions="Center"/>
 
-                <!-- Buton Shared Activities -->
                 <Button Grid.Column="1"
-                Text="👥 Shared"
-                BackgroundColor="#9C27B0"
-                TextColor="White"
-                CornerRadius="8"
-                Padding="15,10"
-                Clicked="OnSharedActivitiesClicked"/>
+                        Text="👥 Shared"
+                        BackgroundColor="#9C27B0"
+                        TextColor="White"
+                        CornerRadius="8"
+                        Padding="15,10"
+                        Clicked="OnSharedActivitiesClicked"/>
 
-                <!-- Buton Settings -->
                 <Button Grid.Column="2"
-                Text="⚙️"
-                BackgroundColor="#607D8B"
-                TextColor="White"
-                CornerRadius="8"
-                WidthRequest="50"
-                Clicked="OnSettingsClicked"/>
+                        Text="⚙️"
+                        BackgroundColor="#607D8B"
+                        TextColor="White"
+                        CornerRadius="8"
+                        WidthRequest="50"
+                        Clicked="OnSettingsClicked"/>
             </Grid>
 
-            <!-- Buton Create New Activity -->
-            <Button Text="+ Create New Activity"
-            Clicked="OnModalOpen"
-            BackgroundColor="#4CAF50"
-            TextColor="White"
-            CornerRadius="8"
-            HeightRequest="50"/>
+            <HorizontalStackLayout Spacing="10">
+                <Button Text="📁 Categories"
+                        Clicked="OnCategoriesClicked"
+                        BackgroundColor="#FF9800"
+                        TextColor="White"
+                        CornerRadius="8"
+                        Padding="15,10"
+                        HorizontalOptions="FillAndExpand"/>
+
+                <!-- 🔥 BUTON PRINCIPAL - Deschide meniul cu tipuri -->
+                <Button Text="+ Create New Activity"
+                        Clicked="OnModalOpen"
+                        BackgroundColor="#4CAF50"
+                        TextColor="White"
+                        CornerRadius="8"
+                        HorizontalOptions="FillAndExpand"/>
+            </HorizontalStackLayout>
         </VerticalStackLayout>
 
-        <!-- CollectionView direct în Grid, fără Grid în plus -->
-        <CollectionView Grid.Row="1"
-               ItemsSource="{Binding Activities}"
-               EmptyView="No activities yet. Create your first activity!"
-               VerticalOptions="FillAndExpand"
-               SelectionMode="Single"
-               SelectionChanged="OnActivitySelected">
+        <!-- 🔥 BUTOANE RAPIDE (opțional - le poți păstra sau elimina) -->
+        <HorizontalStackLayout Grid.Row="1" Padding="20,0,20,10" Spacing="8">
+            <Button Text="💼 Work" Clicked="OnCreateWorkClicked" BackgroundColor="#2196F3" TextColor="White" CornerRadius="15" HeightRequest="35" FontSize="12"/>
+            <Button Text="🏃 Sport" Clicked="OnCreateSportClicked" BackgroundColor="#4CAF50" TextColor="White" CornerRadius="15" HeightRequest="35" FontSize="12"/>
+            <Button Text="📚 Study" Clicked="OnCreateStudyClicked" BackgroundColor="#FF9800" TextColor="White" CornerRadius="15" HeightRequest="35" FontSize="12"/>
+            <Button Text="🛒 Shopping" Clicked="OnCreateShoppingClicked" BackgroundColor="#9C27B0" TextColor="White" CornerRadius="15" HeightRequest="35" FontSize="12"/>
+        </HorizontalStackLayout>
+
+        <!-- Lista activităților -->
+        <CollectionView Grid.Row="2"
+                        ItemsSource="{Binding Activities}"
+                        EmptyView="No activities yet. Create your first activity!"
+                        VerticalOptions="FillAndExpand"
+                        SelectionMode="Single"
+                        SelectionChanged="OnActivitySelected">
 
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:Activity">
@@ -88,13 +105,15 @@
                                 </HorizontalStackLayout>
                             </VerticalStackLayout>
 
-                            <ImageButton Grid.Column="1"
-                                        Source="check.png"
-                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MainViewModel}}, Path=ToggleCompleteCommand}"
-                                        CommandParameter="{Binding .}"
-                                        HeightRequest="30"
-                                        WidthRequest="30"
-                                        BackgroundColor="Transparent"/>
+                            <Button Grid.Column="1"
+                                    Text="✓"
+                                    BackgroundColor="{Binding IsCompleted, Converter={StaticResource BoolToColorConverter}}"
+                                    TextColor="White"
+                                    CornerRadius="15"
+                                    WidthRequest="40"
+                                    HeightRequest="40"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MainViewModel}}, Path=ToggleCompleteCommand}"
+                                    CommandParameter="{Binding .}"/>
                         </Grid>
                     </Border>
                 </DataTemplate>

@@ -1,5 +1,4 @@
-﻿// Factories/ActivityFactoryRegistry.cs
-using SharedActivityManager.Enums;
+﻿using SharedActivityManager.Enums;
 
 namespace SharedActivityManager.Factories
 {
@@ -9,14 +8,11 @@ namespace SharedActivityManager.Factories
 
         static ActivityFactoryRegistry()
         {
-            // Înregistrează fabricile disponibile
             RegisterFactory(ActivityType.Work, () => new WorkActivityCreator());
-            RegisterFactory(ActivityType.Personal, () => new PersonalActivityCreator());
-            RegisterFactory(ActivityType.Health, () => new HealthActivityCreator());
+            RegisterFactory(ActivityType.Personal, () => new ShoppingActivityCreator());
+            RegisterFactory(ActivityType.Health, () => new SportActivityCreator());
             RegisterFactory(ActivityType.Study, () => new StudyActivityCreator());
-
-            // Factory default pentru Other
-            RegisterFactory(ActivityType.Other, () => new WorkActivityCreator()); // sau orice alt default
+            RegisterFactory(ActivityType.Other, () => new WorkActivityCreator());
         }
 
         public static void RegisterFactory(ActivityType type, Func<ActivityCreator> factoryCreator)
@@ -30,14 +26,25 @@ namespace SharedActivityManager.Factories
             {
                 return factoryCreator();
             }
-
-            // Default fallback
             return new WorkActivityCreator();
         }
 
         public static IEnumerable<ActivityType> GetSupportedTypes()
         {
             return _factories.Keys;
+        }
+
+        // Metodă pentru a obține descrierea funcționalităților fiecărui tip
+        public static string GetTypeDescription(ActivityType type)
+        {
+            return type switch
+            {
+                ActivityType.Work => "📋 Work - Timer, Priority, Deadline, Tags",
+                ActivityType.Personal => "🛒 Shopping - Budget, Items list, Store",
+                ActivityType.Health => "🏃 Sport - Timer, Repetitions, Calories, Distance",
+                ActivityType.Study => "📚 Study - Video player, Notes, Quiz",
+                _ => "📝 Other - Basic activity"
+            };
         }
     }
 }

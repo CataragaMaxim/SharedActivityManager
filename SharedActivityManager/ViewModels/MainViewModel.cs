@@ -237,6 +237,9 @@ namespace SharedActivityManager.ViewModels
 
             try
             {
+                // 🔥 OBȚINE SAU CREEAZĂ CATEGORIA CORESPUNZĂTOARE
+                int categoryId = await GetCategoryIdForActivityType(SelectedActivityType);
+
                 var newActivity = new Activity
                 {
                     Title = NewTaskTitle,
@@ -249,15 +252,11 @@ namespace SharedActivityManager.ViewModels
                     ReminderType = SelectedReminderType,
                     NextReminderDate = CalculateNextReminderDate(),
                     RingTone = SelectedRingTone ?? "Default",
-                    IsPublic = IsPublic,  // ← Asta e important!
+                    IsPublic = IsPublic,
                     OwnerId = "current_user",
-                    SharedDate = IsPublic ? DateTime.Now : default
+                    SharedDate = IsPublic ? DateTime.Now : default,
+                    CategoryId = categoryId  // 🔥 SETEAZĂ CATEGORIA
                 };
-
-                System.Diagnostics.Debug.WriteLine($"=== Adding Activity ===");
-                System.Diagnostics.Debug.WriteLine($"Title: {newActivity.Title}");
-                System.Diagnostics.Debug.WriteLine($"IsPublic: {newActivity.IsPublic}");
-                System.Diagnostics.Debug.WriteLine($"OwnerId: {newActivity.OwnerId}");
 
                 await _activityService.SaveActivityWithAlarmAsync(newActivity, _alarmService);
                 await LoadActivitiesAsync();
@@ -269,6 +268,36 @@ namespace SharedActivityManager.ViewModels
             {
                 await _alertService.ShowAlertAsync("Error", $"Failed to add activity: {ex.Message}");
             }
+        }
+
+        private async Task<int> GetCategoryIdForActivityType(ActivityType type)
+        {
+            string categoryName = type switch
+            {
+                ActivityType.Work => "💼 Work",
+                ActivityType.Personal => "🏠 Personal",
+                ActivityType.Health => "💪 Health",
+                ActivityType.Study => "📚 Study",
+                _ => "Other"
+            };
+
+            // 🔥 FOLOSEȘTE SERVICE-UL, NU _database
+            var categories = await _activityService.GetCategoriesAsync();
+            var existing = categories.FirstOrDefault(c => c.Name == categoryName);
+
+            if (existing != null)
+                return existing.Id;
+
+            // Creează categorie nouă dacă nu există
+            var newCategory = new Category
+            {
+                Name = categoryName,
+                ParentCategoryId = 0,
+                DisplayOrder = 1
+            };
+
+            await _activityService.SaveCategoryAsync(newCategory);
+            return newCategory.Id;
         }
 
         public async Task SaveEditedActivity()
@@ -458,6 +487,35 @@ namespace SharedActivityManager.ViewModels
         public async Task<List<RingtoneProj>> GetAvailableRingtonesAsync()
         {
             return await _audioService.GetAvailableRingtonesAsync();
+        }
+
+        [RelayCommand]
+        private async Task OpenActivityDetails(Activity activity)
+        {
+            if (activity == null) return;
+
+            var factory = Factories.ActivityFactoryRegistry.GetCreator(activity.TypeId);
+
+            switch (activity.TypeId)
+            {
+                case ActivityType.Health:
+                    var sportPage = new SportActivityDetailPage(activity);
+                    await Application.Current.MainPage.Navigation.PushAsync(sportPage);
+                    break;
+
+                case ActivityType.Study:
+                    var studyPage = new StudyActivityDetailPage(activity);
+                    await Application.Current.MainPage.Navigation.PushAsync(studyPage);
+                    break;
+
+                // Poți adăuga și pentru Shopping și Work
+
+                default:
+                    // Deschide modalul de editare existent
+                    var modal = new ActivityModal(this, activity);
+                    await Application.Current.MainPage.Navigation.PushModalAsync(modal);
+                    break;
+            }
         }
     }
 }

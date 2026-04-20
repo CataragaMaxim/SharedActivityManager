@@ -1,8 +1,7 @@
-﻿// MainPage.xaml.cs
-using SharedActivityManager.ViewModels;
+﻿using SharedActivityManager.ViewModels;
 using SharedActivityManager.Models;
 using SharedActivityManager.Views;
-using SharedActivityManager.Services;
+using SharedActivityManager.Enums;
 
 namespace SharedActivityManager;
 
@@ -15,14 +14,8 @@ public partial class MainPage : ContentPage
         try
         {
             InitializeComponent();
-            System.Diagnostics.Debug.WriteLine("MainPage: Constructor called");
-
             _viewModel = new MainViewModel();
             BindingContext = _viewModel;
-
-            // 🔥 Abonare la evenimentul global
-            AppEvents.ActivitiesChanged += OnActivitiesChanged;
-            System.Diagnostics.Debug.WriteLine("MainPage: Subscribed to AppEvents");
         }
         catch (Exception ex)
         {
@@ -30,58 +23,44 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private async void OnActivitiesChanged()
-    {
-        System.Diagnostics.Debug.WriteLine("🔥🔥🔥 MainPage: ActivitiesChanged event received!");
-
-        // Asigură-te că rulează pe UI thread
-        if (_viewModel != null)
-        {
-            await MainThread.InvokeOnMainThreadAsync(async () =>
-            {
-                System.Diagnostics.Debug.WriteLine("MainPage: Reloading activities...");
-                await _viewModel.LoadActivitiesAsync();
-                System.Diagnostics.Debug.WriteLine("MainPage: Activities reloaded");
-            });
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine("MainPage: _viewModel is NULL!");
-        }
-    }
-
-    protected override void OnAppearing()
-    {
-        base.OnAppearing();
-        System.Diagnostics.Debug.WriteLine("MainPage: OnAppearing");
-
-        // Asigură-te că evenimentul este încă abonat
-        AppEvents.ActivitiesChanged += OnActivitiesChanged;
-
-        // Reîncărcăm activitățile la fiecare afișare
-        Task.Run(async () =>
-        {
-            await MainThread.InvokeOnMainThreadAsync(async () =>
-            {
-                await _viewModel.LoadActivitiesAsync();
-            });
-        });
-    }
-
-    protected override void OnDisappearing()
-    {
-        base.OnDisappearing();
-        System.Diagnostics.Debug.WriteLine("MainPage: OnDisappearing");
-
-        // NU dezabonați aici - păstrați abonamentul
-        // AppEvents.ActivitiesChanged -= OnActivitiesChanged;
-    }
-
-    // Restul metodelor rămân la fel
+    // 🔥 METODĂ MODIFICATĂ: Deschide meniu cu tipuri de activități
     private async void OnModalOpen(object sender, EventArgs e)
     {
         try
         {
+            var action = await DisplayActionSheet("Select Activity Type", "Cancel", null,
+                "💼 Work",
+                "🏃 Sport",
+                "📚 Study",
+                "🛒 Shopping",
+                "📝 Other");
+
+            switch (action)
+            {
+                case "💼 Work":
+                    _viewModel.SelectedActivityType = ActivityType.Work;
+                    break;
+                case "🏃 Sport":
+                    _viewModel.SelectedActivityType = ActivityType.Health;
+                    break;
+                case "📚 Study":
+                    _viewModel.SelectedActivityType = ActivityType.Study;
+                    break;
+                case "🛒 Shopping":
+                    _viewModel.SelectedActivityType = ActivityType.Personal;
+                    break;
+                case "📝 Other":
+                    _viewModel.SelectedActivityType = ActivityType.Other;
+                    break;
+                default:
+                    return; // Cancel sau altceva
+            }
+
+            // Resetează formularul și deschide modal
+            _viewModel.ResetForm();
+            _viewModel.IsEditMode = false;
+            _viewModel.PageTitle = $"Create New {action} Activity";
+
             var activityModal = new ActivityModal(_viewModel);
             await Navigation.PushModalAsync(activityModal);
         }
@@ -92,24 +71,7 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private async void OnActivitySelected(object sender, SelectionChangedEventArgs e)
-    {
-        try
-        {
-            if (e.CurrentSelection.FirstOrDefault() is Activity selectedActivity)
-            {
-                var activityModal = new ActivityModal(_viewModel, selectedActivity);
-                await Navigation.PushModalAsync(activityModal);
-                ((CollectionView)sender).SelectedItem = null;
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error selecting activity: {ex.Message}");
-            await DisplayAlert("Error", $"Could not open activity: {ex.Message}", "OK");
-        }
-    }
-
+    // 🔥 METODELE EXISTENTE RĂMÂN
     private async void OnSharedActivitiesClicked(object sender, EventArgs e)
     {
         try
@@ -135,6 +97,112 @@ public partial class MainPage : ContentPage
         {
             System.Diagnostics.Debug.WriteLine($"Error navigating to settings: {ex.Message}");
             await DisplayAlert("Error", $"Could not open settings: {ex.Message}", "OK");
+        }
+    }
+
+    private async void OnCategoriesClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            var categoriesPage = new CategoriesPage();
+            await Navigation.PushAsync(categoriesPage);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error navigating to categories: {ex.Message}");
+            await DisplayAlert("Error", $"Could not open categories: {ex.Message}", "OK");
+        }
+    }
+
+    // 🔥 METODE PENTRU BUTOANELE DIRECTE (opțional, dacă vrei să păstrezi ambele opțiuni)
+    private async void OnCreateWorkClicked(object sender, EventArgs e)
+    {
+        _viewModel.SelectedActivityType = ActivityType.Work;
+        _viewModel.ResetForm();
+        _viewModel.IsEditMode = false;
+        _viewModel.PageTitle = "Create New Work Activity";
+
+        var activityModal = new ActivityModal(_viewModel);
+        await Navigation.PushModalAsync(activityModal);
+    }
+
+    private async void OnCreateSportClicked(object sender, EventArgs e)
+    {
+        _viewModel.SelectedActivityType = ActivityType.Health;
+        _viewModel.ResetForm();
+        _viewModel.IsEditMode = false;
+        _viewModel.PageTitle = "Create New Sport Activity";
+
+        var activityModal = new ActivityModal(_viewModel);
+        await Navigation.PushModalAsync(activityModal);
+    }
+
+    private async void OnCreateStudyClicked(object sender, EventArgs e)
+    {
+        _viewModel.SelectedActivityType = ActivityType.Study;
+        _viewModel.ResetForm();
+        _viewModel.IsEditMode = false;
+        _viewModel.PageTitle = "Create New Study Activity";
+
+        var activityModal = new ActivityModal(_viewModel);
+        await Navigation.PushModalAsync(activityModal);
+    }
+
+    private async void OnCreateShoppingClicked(object sender, EventArgs e)
+    {
+        _viewModel.SelectedActivityType = ActivityType.Personal;
+        _viewModel.ResetForm();
+        _viewModel.IsEditMode = false;
+        _viewModel.PageTitle = "Create New Shopping Activity";
+
+        var activityModal = new ActivityModal(_viewModel);
+        await Navigation.PushModalAsync(activityModal);
+    }
+
+    private async void OnActivitySelected(object sender, SelectionChangedEventArgs e)
+    {
+        try
+        {
+            if (e.CurrentSelection.FirstOrDefault() is Activity selectedActivity)
+            {
+                await OpenActivityDetails(selectedActivity);
+                ((CollectionView)sender).SelectedItem = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error selecting activity: {ex.Message}");
+            await DisplayAlert("Error", $"Could not open activity: {ex.Message}", "OK");
+        }
+    }
+
+    private async Task OpenActivityDetails(Activity activity)
+    {
+        switch (activity.TypeId)
+        {
+            case ActivityType.Health:
+                var sportPage = new SportActivityDetailPage(activity);
+                await Navigation.PushAsync(sportPage);
+                break;
+
+            case ActivityType.Study:
+                var studyPage = new StudyActivityDetailPage(activity);
+                await Navigation.PushAsync(studyPage);
+                break;
+
+            case ActivityType.Personal:
+                // Pentru Shopping poți crea o pagină similară
+                await Navigation.PushModalAsync(new ActivityModal(_viewModel, activity));
+                break;
+
+            case ActivityType.Work:
+                await Navigation.PushModalAsync(new ActivityModal(_viewModel, activity));
+                break;
+
+            default:
+                var modal = new ActivityModal(_viewModel, activity);
+                await Navigation.PushModalAsync(modal);
+                break;
         }
     }
 }

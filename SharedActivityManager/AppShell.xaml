@@ -5,6 +5,11 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:SharedActivityManager"
     Title="SharedActivityManager">
+	
+	<ShellContent
+        Title="Categories"
+        ContentTemplate="{DataTemplate local:Views.CategoriesPage}"
+        Route="categories" />
 
     <ShellContent
         Title="Activity"

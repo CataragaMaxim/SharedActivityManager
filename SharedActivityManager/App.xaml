@@ -6,6 +6,10 @@
     <Application.Resources>
         <ResourceDictionary>
             <converters:StringNotNullOrEmptyConverter x:Key="StringNotNullOrEmpty"/>
+            <converters:BoolToColorConverter x:Key="BoolToColorConverter"/>
+            <converters:InvertedBoolConverter x:Key="InvertedBoolConverter"/>
+            <converters:IsNotNullConverter x:Key="IsNotNullConverter"/>
+            <converters:ExpandCollapseConverter x:Key="ExpandCollapseConverter"/>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />

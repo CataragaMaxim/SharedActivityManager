@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="SharedActivityManager.SportActivityDetailPage"
+             Title="Sport Activity">
+
+    <Grid RowDefinitions="Auto, Auto, Auto, Auto, *" Padding="20" RowSpacing="15">
+
+        <!-- Titlu -->
+        <VerticalStackLayout Grid.Row="0">
+            <Label x:Name="TitleLabel" FontSize="24" FontAttributes="Bold" TextColor="#2196F3"/>
+            <Label x:Name="DescriptionLabel" FontSize="14" TextColor="#666666"/>
+        </VerticalStackLayout>
+
+        <!-- Timer Display -->
+        <Border Grid.Row="1" 
+                StrokeShape="RoundRectangle 20" 
+                BackgroundColor="#F0F8FF" 
+                Padding="30">
+            <VerticalStackLayout Spacing="10">
+                <Label Text="⏱️ WORKOUT TIMER" 
+                       FontSize="16" 
+                       FontAttributes="Bold" 
+                       HorizontalOptions="Center"/>
+                <Label x:Name="TimerLabel" 
+                       Text="00:00" 
+                       FontSize="48" 
+                       FontAttributes="Bold" 
+                       HorizontalOptions="Center"/>
+                <Label x:Name="ProgressLabel" 
+                       Text="0%" 
+                       FontSize="14" 
+                       HorizontalOptions="Center"/>
+
+                <ProgressBar x:Name="ProgressBar" 
+                             Progress="0" 
+                             HeightRequest="10"
+                             ProgressColor="#4CAF50"/>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Butoane Control -->
+        <HorizontalStackLayout Grid.Row="2" Spacing="20" HorizontalOptions="Center">
+            <Button x:Name="StartButton" 
+                    Text="▶️ Start" 
+                    Clicked="OnStartClicked"
+                    BackgroundColor="#4CAF50" 
+                    TextColor="White"
+                    CornerRadius="25"
+                    WidthRequest="100"/>
+            <Button x:Name="PauseButton" 
+                    Text="⏸️ Pause" 
+                    Clicked="OnPauseClicked"
+                    BackgroundColor="#FF9800" 
+                    TextColor="White"
+                    CornerRadius="25"
+                    WidthRequest="100"
+                    IsVisible="False"/>
+            <Button x:Name="StopButton" 
+                    Text="⏹️ Stop" 
+                    Clicked="OnStopClicked"
+                    BackgroundColor="#F44336" 
+                    TextColor="White"
+                    CornerRadius="25"
+                    WidthRequest="100"/>
+        </HorizontalStackLayout>
+
+        <!-- Statistici -->
+        <Grid Grid.Row="3" ColumnDefinitions="*,*,*" ColumnSpacing="10">
+            <Border StrokeShape="RoundRectangle 10" BackgroundColor="White" Padding="10">
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="🔥 Calories" FontSize="12" TextColor="#666666" HorizontalOptions="Center"/>
+                    <Label x:Name="CaloriesLabel" Text="0" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+            </Border>
+            <Border StrokeShape="RoundRectangle 10" BackgroundColor="White" Padding="10">
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="🔄 Reps" FontSize="12" TextColor="#666666" HorizontalOptions="Center"/>
+                    <Label x:Name="RepsLabel" Text="0" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center"/>
+                    <Button Text="+1" Clicked="OnAddRepClicked" BackgroundColor="#2196F3" TextColor="White" CornerRadius="15" HeightRequest="30"/>
+                </VerticalStackLayout>
+            </Border>
+            <Border StrokeShape="RoundRectangle 10" BackgroundColor="White" Padding="10">
+                <VerticalStackLayout Spacing="5">
+                    <Label Text="📏 Distance" FontSize="12" TextColor="#666666" HorizontalOptions="Center"/>
+                    <Label x:Name="DistanceLabel" Text="0 km" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center"/>
+                    <Entry x:Name="DistanceEntry" Placeholder="Add km" Keyboard="Numeric" WidthRequest="80" HorizontalOptions="Center"/>
+                    <Button Text="Add" Clicked="OnAddDistanceClicked" BackgroundColor="#2196F3" TextColor="White" CornerRadius="15" HeightRequest="30"/>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+
+        <!-- Buton Save -->
+        <Button Grid.Row="4" 
+                Text="✓ Complete Activity" 
+                Clicked="OnCompleteClicked"
+                BackgroundColor="#4CAF50" 
+                TextColor="White"
+                FontSize="16"
+                FontAttributes="Bold"
+                CornerRadius="25"
+                HeightRequest="50"
+                Margin="0,20"/>
+
+    </Grid>
+</ContentPage>

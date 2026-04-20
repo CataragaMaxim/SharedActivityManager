@@ -1,7 +1,4 @@
-﻿// Factories/WorkActivityCreator.cs
-using System.Text;
-using SharedActivityManager.Abstracts;
-using SharedActivityManager.Enums;
+﻿using SharedActivityManager.Enums;
 using SharedActivityManager.Models;
 
 namespace SharedActivityManager.Factories
@@ -12,31 +9,105 @@ namespace SharedActivityManager.Factories
         {
             return new Activity
             {
-                TypeId = ActivityType.Work
+                TypeId = ActivityType.Work,
+                SpecificDataJson = new WorkActivityData().Serialize()
             };
         }
 
         protected override void ConfigureSpecificProperties(Activity activity, Dictionary<string, object> additionalParams)
         {
-            // Poți salva aceste date în Desc sau în câmpuri dedicate
-            // De exemplu, poți adăuga în Desc informațiile suplimentare
-            var sb = new StringBuilder(activity.Desc ?? "");
+            var workData = WorkActivityData.Deserialize(activity.SpecificDataJson);
 
-            if (additionalParams?.ContainsKey("Priority") == true)
-            {
-                sb.Append($" [Priority: {additionalParams["Priority"]}]");
-            }
-            if (additionalParams?.ContainsKey("ProjectName") == true)
-            {
-                sb.Append($" [Project: {additionalParams["ProjectName"]}]");
-            }
+            workData.Priority = GetParamValue(additionalParams, "Priority", "Medium");
+            workData.ProjectName = GetParamValue(additionalParams, "ProjectName", "");
+            workData.Deadline = GetParamValue(additionalParams, "Deadline", (DateTime?)null);
+            workData.Assignee = GetParamValue(additionalParams, "Assignee", "");
+            workData.EstimatedHours = GetParamValue(additionalParams, "EstimatedHours", 1);
 
-            activity.Desc = sb.ToString();
+            activity.SpecificDataJson = workData.Serialize();
         }
 
-        protected override ReminderType GetDefaultReminderType()
+        protected override ReminderType GetDefaultReminderType() => ReminderType.Daily;
+
+        // ========== METODE SPECIFICE WORK ==========
+
+        public WorkActivityData GetWorkData(Activity activity)
         {
-            return ReminderType.Daily; // Work activities need daily reminders
+            return WorkActivityData.Deserialize(activity.SpecificDataJson);
+        }
+
+        public void SaveWorkData(Activity activity, WorkActivityData data)
+        {
+            activity.SpecificDataJson = data.Serialize();
+        }
+
+        public void SetPriority(Activity activity, string priority)
+        {
+            var data = GetWorkData(activity);
+            data.Priority = priority;
+            SaveWorkData(activity, data);
+        }
+
+        public void LogHours(Activity activity, int hours)
+        {
+            var data = GetWorkData(activity);
+            data.LoggedHours += hours;
+
+            if (data.LoggedHours >= data.EstimatedHours)
+            {
+                activity.IsCompleted = true;
+            }
+
+            SaveWorkData(activity, data);
+        }
+
+        public void AddTag(Activity activity, string tag)
+        {
+            var data = GetWorkData(activity);
+            if (!data.Tags.Contains(tag))
+                data.Tags.Add(tag);
+            SaveWorkData(activity, data);
+        }
+
+        public void RemoveTag(Activity activity, string tag)
+        {
+            var data = GetWorkData(activity);
+            data.Tags.Remove(tag);
+            SaveWorkData(activity, data);
+        }
+
+        public bool IsOverdue(Activity activity)
+        {
+            return GetWorkData(activity).IsOverdue;
+        }
+
+        public double GetProgressPercentage(Activity activity)
+        {
+            return GetWorkData(activity).GetProgressPercentage();
+        }
+
+        public string GetPriorityColor(string priority)
+        {
+            return priority switch
+            {
+                "Critical" => "#D32F2F",
+                "High" => "#F44336",
+                "Medium" => "#FF9800",
+                "Low" => "#4CAF50",
+                _ => "#9E9E9E"
+            };
+        }
+
+        public string GetPriorityIcon(string priority)
+        {
+            return priority switch
+            {
+                "Critical" => "🔴",
+                "High" => "🟠",
+                "Medium" => "🟡",
+                "Low" => "🟢",
+                _ => "⚪"
+            };
         }
     }
 }

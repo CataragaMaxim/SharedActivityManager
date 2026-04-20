@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:SharedActivityManager.ViewModels"
+             xmlns:models="clr-namespace:SharedActivityManager.Models"
+             xmlns:converters="clr-namespace:SharedActivityManager.Converters"
+             x:Class="SharedActivityManager.CategoriesPage"
+             Title="Categories"
+             x:DataType="viewmodels:CategoriesViewModel">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+        <!-- Header cu statistici -->
+        <VerticalStackLayout Grid.Row="0" Padding="15" Spacing="5" BackgroundColor="#F5F5F5">
+            <Label Text="📁 Activity Categories"
+                   FontSize="24"
+                   FontAttributes="Bold"
+                   TextColor="#2196F3"/>
+
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                <Border StrokeShape="RoundRectangle 10" BackgroundColor="White" Padding="10">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="Total" FontSize="12" TextColor="#666666"/>
+                        <Label Text="{Binding TotalActivities}" FontSize="24" FontAttributes="Bold" TextColor="#2196F3"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border StrokeShape="RoundRectangle 10" BackgroundColor="White" Padding="10">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="Completed" FontSize="12" TextColor="#666666"/>
+                        <Label Text="{Binding CompletedActivities}" FontSize="24" FontAttributes="Bold" TextColor="#4CAF50"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border StrokeShape="RoundRectangle 10" BackgroundColor="White" Padding="10">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="Progress" FontSize="12" TextColor="#666666"/>
+                        <Label Text="{Binding CompletionPercentage, StringFormat='{0:F0}%'}" FontSize="24" FontAttributes="Bold" TextColor="#FF9800"/>
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+        </VerticalStackLayout>
+
+        <!-- Bară de căutare -->
+        <SearchBar Grid.Row="1" 
+                   Placeholder="Search categories or activities..."
+                   Text="{Binding SearchText}"
+                   SearchCommand="{Binding SearchCommand}"
+                   Margin="15,5"/>
+
+        <!-- Butoane acțiune -->
+        <HorizontalStackLayout Grid.Row="2" Margin="15,5" Spacing="10">
+            <Button Text="+ New Category" 
+                    Command="{Binding ShowCreateCategoryDialogCommand}"
+                    BackgroundColor="#4CAF50" 
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="40"
+                    HorizontalOptions="Start"/>
+
+            <Button Text="📤 Export" 
+                    Command="{Binding ExportCommand}"
+                    BackgroundColor="#2196F3" 
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="40"
+                    HorizontalOptions="Start"/>
+
+            <Button Text="📥 Import" 
+                    Command="{Binding ImportCommand}"
+                    BackgroundColor="#FF9800" 
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="40"
+                    HorizontalOptions="Start"/>
+        </HorizontalStackLayout>
+
+        <!-- Dialog pentru creare categorie -->
+        <Border Grid.Row="3"
+                IsVisible="{Binding IsCreatingCategory}"
+                StrokeShape="RoundRectangle 10"
+                BackgroundColor="White"
+                Padding="15"
+                Margin="15,0">
+            <VerticalStackLayout Spacing="10">
+                <Label Text="Create New Category" FontAttributes="Bold" FontSize="16"/>
+                <Entry Placeholder="Category name" Text="{Binding NewCategoryName}"/>
+                <HorizontalStackLayout Spacing="10">
+                    <Button Text="Create" Command="{Binding CreateNewCategoryCommand}" BackgroundColor="#4CAF50" TextColor="White"/>
+                    <Button Text="Cancel" Command="{Binding CancelCreateCategoryCommand}" BackgroundColor="#9E9E9E" TextColor="White"/>
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Lista categoriilor cu suport pentru expand/collapse -->
+        <RefreshView Grid.Row="3" 
+                     Command="{Binding RefreshCommand}" 
+                     IsRefreshing="{Binding IsLoading}"
+                     IsVisible="{Binding IsCreatingCategory, Converter={StaticResource InvertedBoolConverter}}">
+
+            <CollectionView ItemsSource="{Binding DisplayCategories}" 
+                            SelectionMode="Single" 
+                            SelectionChanged="OnCategorySelected">
+
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:ActivityComponent">
+                        <!-- 🔥 MODIFICAT: Am înlocuit GestureRecognizers cu un Grid care are TapGestureRecognizer -->
+                        <Border Stroke="#E0E0E0" 
+                                StrokeThickness="1" 
+                                StrokeShape="RoundRectangle 10" 
+                                Padding="0" 
+                                Margin="10,5">
+
+                            <Grid Padding="15"
+                                  ColumnDefinitions="Auto,*, Auto">
+
+                                <!-- Gesturile se adaugă pe Grid, nu pe Border -->
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer 
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:CategoriesViewModel}}, Path=SelectCategoryCommand}"
+                                        CommandParameter="{Binding .}"/>
+                                </Grid.GestureRecognizers>
+
+                                <!-- Buton expand/collapse pentru categorii -->
+                                <Button Grid.Column="0"
+                                        x:Name="ExpandButton"
+                                        Text="{Binding IsExpanded, Converter={StaticResource ExpandCollapseConverter}}"
+                                        BackgroundColor="Transparent"
+                                        TextColor="#666666"
+                                        FontSize="16"
+                                        WidthRequest="30"
+                                        Clicked="OnExpandButtonClicked"
+                                        CommandParameter="{Binding .}"
+                                        IsVisible="{Binding IsComposite}"/>
+
+                                <!-- Conținut principal -->
+                                <VerticalStackLayout Grid.Column="1" Spacing="5" Margin="5,0">
+                                    <Label Text="{Binding Name}" FontSize="16" FontAttributes="Bold" TextColor="#333333"/>
+                                    <Label Text="{Binding Description}" FontSize="12" TextColor="#666666" IsVisible="{Binding Description, Converter={StaticResource StringNotNullOrEmpty}}"/>
+
+                                    <HorizontalStackLayout Spacing="10">
+                                        <Label Text="{Binding TotalActivitiesCount, StringFormat='📊 {0} activities'}" FontSize="11" TextColor="#999999"/>
+                                        <Label Text="{Binding CompletedCount, StringFormat='✓ {0} completed'}" FontSize="11" TextColor="#4CAF50"/>
+                                        <Label Text="{Binding CompletionPercentage, StringFormat='📈 {0:F0}%'}" FontSize="11" TextColor="#2196F3"/>
+                                    </HorizontalStackLayout>
+                                </VerticalStackLayout>
+
+                                <!-- Buton detalii -->
+                                <Button Grid.Column="2"
+                                        Text="👁️"
+                                        BackgroundColor="#2196F3"
+                                        TextColor="White"
+                                        CornerRadius="15"
+                                        WidthRequest="40"
+                                        HeightRequest="40"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:CategoriesViewModel}}, Path=ViewCategoryDetailsCommand}"
+                                        CommandParameter="{Binding .}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </RefreshView>
+
+        <!-- Rezultate căutare -->
+        <CollectionView Grid.Row="3" 
+                        ItemsSource="{Binding SearchResults}"
+                        IsVisible="{Binding SearchResults, Converter={StaticResource IsNotNullConverter}}">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Border Stroke="#E0E0E0" StrokeThickness="1" StrokeShape="RoundRectangle 10" Padding="15" Margin="10,5">
+                        <VerticalStackLayout>
+                            <Label Text="{Binding Name}" FontAttributes="Bold"/>
+                            <Label Text="{Binding Description}" FontSize="12" TextColor="#666666"/>
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

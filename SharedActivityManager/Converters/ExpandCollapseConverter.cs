@@ -7,16 +7,16 @@ using System.Threading.Tasks;
 
 namespace SharedActivityManager.Converters
 {
-    public class InvertedBoolConverter : IValueConverter
+    public class ExpandCollapseConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            return !(bool)value;
+            return (bool)value ? "▼" : "▶";
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            return !(bool)value;
+            throw new NotImplementedException();
         }
     }
 }
