@@ -4,6 +4,8 @@ using SharedActivityManager.Abstracts.Platforms;
 using SharedActivityManager.Models;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using SharedActivityManager.Services.Flyweight;
+using SharedActivityManager.Enums;
 
 namespace SharedActivityManager;
 
@@ -135,7 +137,7 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
 
             await DisplayAlert("Success", $"✅ Successfully deleted {count} activities!", "OK");
 
-            await Shell.Current.GoToAsync("//MainPage");
+            await Shell.Current.GoToAsync("///MainPage");
         }
         catch (Exception ex)
         {
@@ -148,6 +150,13 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
     {
         try
         {
+            if (Shell.Current == null)
+            {
+                System.Diagnostics.Debug.WriteLine("Shell.Current is null!");
+                await DisplayAlert("Error", "Navigation service not available", "OK");
+                return;
+            }
+
             var confirm = await DisplayAlert(
                 "⚠️ DANGER ZONE ⚠️",
                 "This will delete ALL activities AND ALL categories!\n\nThis action CANNOT be undone!\n\nAre you absolutely sure?",
@@ -203,7 +212,7 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
 
             await DisplayAlert("Success", "✅ Application has been reset to factory settings!", "OK");
 
-            await Shell.Current.GoToAsync("//MainPage");
+            await Shell.Current.GoToAsync("///MainPage");
         }
         catch (Exception ex)
         {
@@ -239,6 +248,45 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
     protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private void OnTestFlyweightMemory(object sender, EventArgs e)
+    {
+        var factory = ActivityTypeMetadataFactory.Instance;
+        var cacheSize = factory.CacheSize;
+
+        // Creează mai multe activități de același tip
+        var metadata1 = ActivityType.Work.GetMetadata();
+        var metadata2 = ActivityType.Work.GetMetadata();
+        var metadata3 = ActivityType.Work.GetMetadata();
+
+        var areSame = ReferenceEquals(metadata1, metadata2) && ReferenceEquals(metadata2, metadata3);
+
+        var message = $"📊 Flyweight Test Results:\n\n" +
+                      $"Cache size: {cacheSize} metadata objects\n" +
+                      $"All Work metadata are same instance: {(areSame ? "✅ YES" : "❌ NO")}\n\n" +
+                      $"Memory saved: {cacheSize} instances instead of unlimited copies";
+
+        DisplayAlert("Flyweight Test", message, "OK");
+    }
+
+    private async void OnFixMissingCategoryIds(object sender, EventArgs e)
+    {
+        try
+        {
+            var helper = new CategoryHelper(_database);
+            await helper.FixActivitiesCategoryIds();
+
+            await DisplayAlert("Success", "All activities have been fixed!", "OK");
+
+            // Trimite notificare pentru refresh
+            var messagingService = new MessagingService();
+            messagingService.Send(new ActivitiesChangedMessage { Action = "Fixed" });
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", ex.Message, "OK");
+        }
     }
 
     public new event PropertyChangedEventHandler PropertyChanged;

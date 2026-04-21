@@ -44,7 +44,7 @@ public static class MauiProgram
 
         // Înregistrare pagini
         builder.Services.AddTransient<MainPage>();
-        builder.Services.AddTransient<Views.SharedActivitiesPage>();
+        builder.Services.AddTransient<SharedActivitiesPage>();
         builder.Services.AddTransient<ActivityModal>();
         builder.Services.AddTransient<CategoriesPage>();
 

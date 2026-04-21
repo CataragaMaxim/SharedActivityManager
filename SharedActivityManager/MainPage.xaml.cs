@@ -1,6 +1,5 @@
 ﻿using SharedActivityManager.ViewModels;
 using SharedActivityManager.Models;
-using SharedActivityManager.Views;
 using SharedActivityManager.Enums;
 
 namespace SharedActivityManager;
@@ -76,7 +75,7 @@ public partial class MainPage : ContentPage
     {
         try
         {
-            var sharedPage = new Views.SharedActivitiesPage();
+            var sharedPage = new SharedActivitiesPage();
             await Navigation.PushAsync(sharedPage);
         }
         catch (Exception ex)

@@ -66,6 +66,13 @@ namespace SharedActivityManager.Services
                 activity.OwnerId = "current_user"; // TODO: din sesiune
                 activity.SharedDate = isPublic ? DateTime.Now : default;
 
+                if (activity.CategoryId == 0)
+                {
+                    // Obține categoria corespunzătoare tipului
+                    var categoryId = await GetCategoryIdForActivityType(type);
+                    activity.CategoryId = categoryId;
+                }
+
                 // 3. Salvează în baza de date
                 await _activityService.SaveActivityAsync(activity);
                 System.Diagnostics.Debug.WriteLine($"Activity saved with ID: {activity.Id}");
@@ -104,16 +111,44 @@ namespace SharedActivityManager.Services
             }
         }
 
+        private async Task<int> GetCategoryIdForActivityType(ActivityType type)
+        {
+            string categoryName = type switch
+            {
+                ActivityType.Work => "💼 Work",
+                ActivityType.Personal => "🏠 Personal",
+                ActivityType.Health => "💪 Health",
+                ActivityType.Study => "📚 Study",
+                _ => "Other"
+            };
+
+            var categories = await _activityService.GetCategoriesAsync();
+            var existing = categories.FirstOrDefault(c => c.Name == categoryName);
+
+            if (existing != null)
+                return existing.Id;
+
+            var newCategory = new Category
+            {
+                Name = categoryName,
+                ParentCategoryId = 0,
+                DisplayOrder = 1
+            };
+
+            await _activityService.SaveCategoryAsync(newCategory);
+            return newCategory.Id;
+        }
+
         // Restul metodelor rămân la fel...
         // (UpdateCompleteActivityAsync, DeleteCompleteActivityAsync, CopyActivityAsync,
         //  CompleteActivityAsync, ReactivateActivityAsync, RescheduleAlarmAsync,
         //  StopCurrentAlarmAsync, ShareActivityAsync, CopySharedActivityAsync,
         //  GetUserStatisticsAsync, GetActivitiesForDateAsync, GetCurrentWeekActivitiesAsync)
 
-    /// <summary>
-    /// Actualizează o activitate existentă
-    /// </summary>
-    public async Task UpdateCompleteActivityAsync(Activity activity)
+        /// <summary>
+        /// Actualizează o activitate existentă
+        /// </summary>
+        public async Task UpdateCompleteActivityAsync(Activity activity)
     {
             try
             {

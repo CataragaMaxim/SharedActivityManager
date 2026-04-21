@@ -37,6 +37,19 @@
                                 TextColor="White"
                                 CornerRadius="8"/>
                     </Grid>
+                    <Button Text="🧪 Test Flyweight Memory"
+                            Clicked="OnTestFlyweightMemory"
+                            BackgroundColor="#9C27B0"
+                            TextColor="White"
+                            CornerRadius="8"
+                            HeightRequest="50"/>
+                    <Button Text="🔧 Fix Missing Category IDs"
+                            Clicked="OnFixMissingCategoryIds"
+                            BackgroundColor="#FF9800"
+                            TextColor="White"
+                            CornerRadius="8"
+                            HeightRequest="50"/>
+                    
                 </VerticalStackLayout>
             </Border>
 

@@ -2,7 +2,7 @@
 using SharedActivityManager.Services;
 using SharedActivityManager.ViewModels;
 
-namespace SharedActivityManager.Views
+namespace SharedActivityManager
 {
     public partial class SharedActivitiesPage : ContentPage
     {

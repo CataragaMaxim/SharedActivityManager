@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:viewmodels="clr-namespace:SharedActivityManager.ViewModels"
              xmlns:models="clr-namespace:SharedActivityManager.Models"
-             x:Class="SharedActivityManager.Views.SharedActivitiesPage"
+             x:Class="SharedActivityManager.SharedActivitiesPage"
              Title="Shared Activities"
              x:DataType="viewmodels:SharedActivitiesViewModel">
 

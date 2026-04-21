@@ -6,15 +6,20 @@
     xmlns:local="clr-namespace:SharedActivityManager"
     Title="SharedActivityManager">
 	
-	<ShellContent
-        Title="Categories"
-        ContentTemplate="{DataTemplate local:Views.CategoriesPage}"
-        Route="categories" />
-
     <ShellContent
         Title="Activity"
         ContentTemplate="{DataTemplate local:MainPage}"
         Route="MainPage" />
+
+	<ShellContent
+        Title="Categories"
+        ContentTemplate="{DataTemplate local:CategoriesPage}"
+        Route="categories" />
+
+    <ShellContent
+        Title="Shared"
+        ContentTemplate="{DataTemplate local:SharedActivitiesPage}"
+        Route="SharedActivitiesPage" />
 
     <ShellContent
         Title="Chat"

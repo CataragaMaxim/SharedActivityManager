@@ -6,8 +6,9 @@ using SharedActivityManager.Abstracts.Platforms;
 using SharedActivityManager.Builders;
 using SharedActivityManager.Enums;
 using SharedActivityManager.Models;
-using SharedActivityManager.Services;
 using SharedActivityManager.Repositories;
+using SharedActivityManager.Services;
+using SharedActivityManager.Services.Flyweight;
 
 namespace SharedActivityManager.ViewModels
 {
@@ -234,6 +235,9 @@ namespace SharedActivityManager.ViewModels
 
             try
             {
+                // 🔥 OBȚINE CATEGORYID-UL CORECT ÎNAINTE DE A CREA ACTIVITATEA
+                int categoryId = await GetCategoryIdForActivityType(SelectedActivityType);
+
                 var additionalParams = new Dictionary<string, object>();
 
                 switch (SelectedActivityType)
@@ -253,6 +257,26 @@ namespace SharedActivityManager.ViewModels
                         additionalParams["Budget"] = 0m;
                         break;
                 }
+
+                var newActivity = new Activity
+                {
+                    Title = NewTaskTitle,
+                    Desc = NewTaskDesc ?? string.Empty,
+                    TypeId = SelectedActivityType,
+                    StartDate = SelectedStartDate,
+                    StartTime = CombinedStartDateTime,
+                    AlarmSet = AlarmSet,
+                    IsCompleted = false,
+                    ReminderType = SelectedReminderType,
+                    NextReminderDate = CalculateNextReminderDate(),
+                    RingTone = SelectedRingTone ?? "Default",
+                    IsPublic = IsPublic,
+                    OwnerId = "current_user",
+                    SharedDate = IsPublic ? DateTime.Now : default,
+                    CategoryId = categoryId  // 🔥 ACUM ESTE SETAT CORECT
+                };
+
+                System.Diagnostics.Debug.WriteLine($"Creating activity: {newActivity.Title}, Type: {SelectedActivityType}, CategoryId: {categoryId}");
 
                 await _activityFacade.CreateCompleteActivityAsync(
                     NewTaskTitle,
@@ -274,6 +298,7 @@ namespace SharedActivityManager.ViewModels
             }
         }
 
+
         private async Task<int> GetCategoryIdForActivityType(ActivityType type)
         {
             string categoryName = type switch
@@ -289,8 +314,12 @@ namespace SharedActivityManager.ViewModels
             var existing = categories.FirstOrDefault(c => c.Name == categoryName);
 
             if (existing != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"Found category: {categoryName} with ID={existing.Id}");
                 return existing.Id;
+            }
 
+            // Creează categorie nouă dacă nu există
             var newCategory = new Category
             {
                 Name = categoryName,
@@ -299,6 +328,7 @@ namespace SharedActivityManager.ViewModels
             };
 
             await _activityService.SaveCategoryAsync(newCategory);
+            System.Diagnostics.Debug.WriteLine($"Created new category: {categoryName} with ID={newCategory.Id}");
             return newCategory.Id;
         }
 

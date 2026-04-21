@@ -14,11 +14,7 @@ public partial class App : Application
 
             SingletonTestService.TestDatabaseSingleton();
 
-            MainPage = new NavigationPage(new MainPage())
-            {
-                BarBackgroundColor = Color.FromArgb("#2196F3"),
-                BarTextColor = Colors.White
-            };
+            MainPage = new AppShell();
         }
         catch (Exception ex)
         {

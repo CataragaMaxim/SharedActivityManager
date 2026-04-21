@@ -52,7 +52,7 @@
         <HorizontalStackLayout Grid.Row="2" Margin="15,5" Spacing="10">
             <!-- Butoanele existente -->
             <Button Text="+ New Category" Command="{Binding ShowCreateCategoryDialogCommand}" BackgroundColor="#4CAF50" TextColor="White" CornerRadius="8" HeightRequest="40"/>
-            <Button Text="📤 Export" Command="{Binding ExportCommand}" BackgroundColor="#2196F3" TextColor="White" CornerRadius="8" HeightRequest="40"/>
+            <Button Text="📤 Export" Command="{Binding ExportToFileCommand}" BackgroundColor="#2196F3" TextColor="White" CornerRadius="8" HeightRequest="40"/>
             <Button Text="📥 Import" Command="{Binding ImportCommand}" BackgroundColor="#FF9800" TextColor="White" CornerRadius="8" HeightRequest="40"/>
 
             <!-- 🔥 BUTOANE NOI PENTRU TEST -->
