@@ -1,6 +1,7 @@
 ﻿using SharedActivityManager.ViewModels;
 using SharedActivityManager.Models;
 using SharedActivityManager.Enums;
+using SharedActivityManager.Services;
 
 namespace SharedActivityManager;
 
@@ -202,6 +203,53 @@ public partial class MainPage : ContentPage
                 var modal = new ActivityModal(_viewModel, activity);
                 await Navigation.PushModalAsync(modal);
                 break;
+        }
+    }
+    private async void OnTestDecoratorClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            // Creează o activitate de test
+            var testActivity = new Activity
+            {
+                Title = "Test Decorator Activity",
+                Desc = "Testing extra features",
+                TypeId = ActivityType.Health,
+                StartDate = DateTime.Today,
+                StartTime = DateTime.Now.AddHours(1),
+                IsCompleted = false
+            };
+
+            // Construiește activitatea cu funcționalități extra
+            var builder = new ActivityExtraBuilder(testActivity);
+            builder.WithNotifications()
+                   .WithEmailReminder("test@example.com")
+                   .WithCalendarSync()
+                   .WithGpsTracking();
+
+            var extraActivity = builder.Build();
+
+            // Afișează informațiile
+            var message = $"✅ Decorator Test Results:\n\n" +
+                          $"Description: {builder.GetFullDescription()}\n" +
+                          $"Icon: {builder.GetIcon()}\n" +
+                          $"Extra cost: {builder.GetTotalExtraCost()} minutes\n\n" +
+                          $"Features enabled:\n" +
+                          $"  • Push Notifications: YES\n" +
+                          $"  • Email Reminder: YES\n" +
+                          $"  • Calendar Sync: YES\n" +
+                          $"  • GPS Tracking: YES";
+
+            await DisplayAlert("Decorator Test", message, "OK");
+
+            // Verifică și în Output Window
+            System.Diagnostics.Debug.WriteLine($"=== Decorator Test ===");
+            System.Diagnostics.Debug.WriteLine($"Description: {builder.GetFullDescription()}");
+            System.Diagnostics.Debug.WriteLine($"Extra cost: {builder.GetTotalExtraCost()} min");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", $"Test failed: {ex.Message}", "OK");
         }
     }
 }

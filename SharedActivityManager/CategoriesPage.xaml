@@ -59,6 +59,13 @@
             <Button Text="🧪 Test CSV" Command="{Binding TestCsvExportCommand}" BackgroundColor="#607D8B" TextColor="White" CornerRadius="8" HeightRequest="40"/>
             <Button Text="🧪 Test JSON" Command="{Binding TestJsonExportCommand}" BackgroundColor="#607D8B" TextColor="White" CornerRadius="8" HeightRequest="40"/>
             <Button Text="🧪 Test XML" Command="{Binding TestXmlExportCommand}" BackgroundColor="#607D8B" TextColor="White" CornerRadius="8" HeightRequest="40"/>
+
+            <Button Text="🔍 Test Extra Features"
+                    Command="{Binding TestExtraFeaturesCommand}"
+                    BackgroundColor="#9C27B0"
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="40"/>
         </HorizontalStackLayout>
 
         <!-- Dialog pentru creare categorie -->

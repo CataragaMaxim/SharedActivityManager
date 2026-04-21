@@ -237,38 +237,118 @@
                 </VerticalStackLayout>
             </Border>
 
+            <!-- Secțiunea Extra Features -->
+            <Border Stroke="#E0E0E0"
+        StrokeThickness="1"
+        StrokeShape="RoundRectangle 10"
+        Padding="15">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="✨ Extra Features"
+               FontSize="16"
+               FontAttributes="Bold"
+               TextColor="#9C27B0"/>
+
+                    <!-- Notificări -->
+                    <Grid ColumnDefinitions="Auto, *">
+                        <Switch Grid.Column="0" 
+                                IsToggled="{Binding EnableNotifications}"
+                                HorizontalOptions="Start"/>
+                        <Label Grid.Column="1" 
+                               Text="🔔 Push Notifications"
+                               VerticalOptions="Center"
+                               Margin="10,0"/>
+                    </Grid>
+
+                    <!-- Email Reminder -->
+                    <Grid ColumnDefinitions="Auto, *">
+                        <Switch Grid.Column="0" 
+                                IsToggled="{Binding EnableEmailReminder}"
+                                HorizontalOptions="Start"/>
+                        <VerticalStackLayout Grid.Column="1" Margin="10,0">
+                            <Label Text="📧 Email Reminder"/>
+                            <Entry Placeholder="Email address"
+                                   Text="{Binding EmailAddress}"
+                                   IsVisible="{Binding EnableEmailReminder}"
+                                   HeightRequest="40"/>
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <!-- Calendar Sync -->
+                    <Grid ColumnDefinitions="Auto, *">
+                        <Switch Grid.Column="0" 
+                                IsToggled="{Binding EnableCalendarSync}"
+                                HorizontalOptions="Start"/>
+                        <Label Grid.Column="1" 
+                               Text="📅 Sync to Calendar"
+                               VerticalOptions="Center"
+                               Margin="10,0"/>
+                    </Grid>
+
+                    <!-- GPS Tracking -->
+                    <Grid ColumnDefinitions="Auto, *">
+                        <Switch Grid.Column="0" 
+                                IsToggled="{Binding EnableGpsTracking}"
+                                HorizontalOptions="Start"/>
+                        <Label Grid.Column="1" 
+                               Text="🗺️ GPS Tracking (for Sport)"
+                               VerticalOptions="Center"
+                               Margin="10,0"/>
+                    </Grid>
+
+                    <!-- Summary -->
+                    <Border Stroke="#9C27B0"
+                            StrokeThickness="1"
+                            StrokeShape="RoundRectangle 8"
+                            Padding="10"
+                            IsVisible="{Binding ExtraFeaturesDescription, Converter={StaticResource StringNotNullOrEmpty}}">
+                        <VerticalStackLayout Spacing="5">
+                            <Label Text="✨ Selected Features:"
+                                   FontSize="12"
+                                   FontAttributes="Bold"
+                                   TextColor="#9C27B0"/>
+                            <Label Text="{Binding ExtraFeaturesDescription}"
+                                   FontSize="11"
+                                   TextColor="#666666"/>
+                            <Label Text="{Binding TotalExtraCost, StringFormat='⏱️ Extra time: {0} min'}"
+                                   FontSize="11"
+                                   TextColor="#FF9800"/>
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
+            </Border>
+
             <!-- Butoane acțiune -->
             <VerticalStackLayout Spacing="10" Margin="0,20,0,0">
 
                 <!-- Save Button -->
                 <Button Text="💾 Save Activity"
-            Clicked="OnSaveActivity"
-            BackgroundColor="#4CAF50"
-            TextColor="White"
-            FontSize="18"
-            FontAttributes="Bold"
-            CornerRadius="25"
-            HeightRequest="55"/>
+                        Clicked="OnSaveActivity"
+                        BackgroundColor="#4CAF50"
+                        TextColor="White"
+                        FontSize="18"
+                        FontAttributes="Bold"
+                        CornerRadius="25"
+                        HeightRequest="55"/>
 
                 <!-- Delete Button - doar în mod editare -->
                 <Button Text="🗑️ Delete Activity"
-            Clicked="OnDeleteActivity"
-            BackgroundColor="#F44336"
-            TextColor="White"
-            FontSize="16"
-            FontAttributes="Bold"
-            CornerRadius="25"
-            HeightRequest="50"
-            IsVisible="{Binding IsEditMode}"/>
+                        Clicked="OnDeleteActivity"
+                        BackgroundColor="#F44336"
+                        TextColor="White"
+                        FontSize="16"
+                        FontAttributes="Bold"
+                        CornerRadius="25"
+                        HeightRequest="50"
+                        IsVisible="{Binding IsEditMode}"/>
 
                 <!-- Close Button -->
                 <Button Text="❌ Cancel"
-            Clicked="OnCloseModal"
-            BackgroundColor="#9E9E9E"
-            TextColor="White"
-            FontSize="16"
-            CornerRadius="25"
-            HeightRequest="50"/>
+                        Clicked="OnCloseModal"
+                        BackgroundColor="#9E9E9E"
+                        TextColor="White"
+                        FontSize="16"
+                        CornerRadius="25"
+                        HeightRequest="50"/>
             </VerticalStackLayout>
 
             <Label Text="* Required fields"

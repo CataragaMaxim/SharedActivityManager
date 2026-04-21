@@ -1,5 +1,6 @@
 ﻿// ViewModels/MainViewModel.cs
 using System.Collections.ObjectModel;
+using System.Net.Mail;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SharedActivityManager.Abstracts.Platforms;
@@ -68,6 +69,30 @@ namespace SharedActivityManager.ViewModels
         [ObservableProperty]
         private Activity selectedActivity;
 
+        [ObservableProperty]
+        private bool _enableNotifications = false;
+
+        [ObservableProperty]
+        private bool _enableEmailReminder = false;
+
+        [ObservableProperty]
+        private string _emailAddress = string.Empty;
+
+        [ObservableProperty]
+        private bool _enableCalendarSync = false;
+
+        [ObservableProperty]
+        private bool _enableGpsTracking = false;
+
+        [ObservableProperty]
+        private List<string> _attachments = new();
+
+        [ObservableProperty]
+        private string _extraFeaturesDescription = string.Empty;
+
+        [ObservableProperty]
+        private int _totalExtraCost = 0;
+
         // ========== PROPRIETĂȚI CALCULATE ==========
         public DateTime CombinedStartDateTime => SelectedStartDate.Add(SelectedStartTime);
 
@@ -121,6 +146,84 @@ namespace SharedActivityManager.ViewModels
 
             // Restaurare alarme
             Task.Run(async () => await RestoreAlarmsAsync());
+        }
+
+        private async Task CreateActivityWithExtras()
+        {
+            if (string.IsNullOrWhiteSpace(NewTaskTitle))
+            {
+                await _alertService.ShowAlertAsync("Validation", "Title is required");
+                return;
+            }
+
+            try
+            {
+                int categoryId = await GetCategoryIdForActivityType(SelectedActivityType);
+
+                var newActivity = new Activity
+                {
+                    Title = NewTaskTitle,
+                    Desc = NewTaskDesc ?? string.Empty,
+                    TypeId = SelectedActivityType,
+                    StartDate = SelectedStartDate,
+                    StartTime = CombinedStartDateTime,
+                    AlarmSet = AlarmSet,
+                    IsCompleted = false,
+                    ReminderType = SelectedReminderType,
+                    NextReminderDate = CalculateNextReminderDate(),
+                    RingTone = SelectedRingTone ?? "Default",
+                    IsPublic = IsPublic,
+                    OwnerId = "current_user",
+                    SharedDate = IsPublic ? DateTime.Now : default,
+                    CategoryId = categoryId
+                };
+
+                // 🔥 CONSTRUIEȘTE ACTIVITATEA CU FUNCȚIONALITĂȚI EXTRA
+                var builder = new ActivityExtraBuilder(newActivity);
+
+                if (EnableNotifications)
+                    builder.WithNotifications();
+
+                if (EnableEmailReminder && !string.IsNullOrEmpty(EmailAddress))
+                    builder.WithEmailReminder(EmailAddress);
+
+                if (EnableCalendarSync)
+                    builder.WithCalendarSync();
+
+                if (EnableGpsTracking)
+                    builder.WithGpsTracking();
+
+                foreach (var attachment in Attachments)
+                    builder.WithAttachment(attachment);
+
+                // Salvează descrierea pentru afișare
+                ExtraFeaturesDescription = builder.GetFullDescription();
+                TotalExtraCost = builder.GetTotalExtraCost();
+
+                // Execută activitatea (în cazul în care e marcată ca completată)
+                // await builder.ExecuteAsync();
+
+                await _activityFacade.CreateCompleteActivityAsync(
+                    NewTaskTitle,
+                    NewTaskDesc ?? string.Empty,
+                    SelectedActivityType,
+                    CombinedStartDateTime,
+                    AlarmSet,
+                    SelectedReminderType,
+                    SelectedRingTone ?? "Default",
+                    IsPublic,
+                    null);
+
+                await LoadActivitiesAsync();
+                ResetForm();
+
+                await _alertService.ShowAlertAsync("Success",
+                    $"Activity created with extras!\n{ExtraFeaturesDescription}\nTotal extra time: {TotalExtraCost} min");
+            }
+            catch (Exception ex)
+            {
+                await _alertService.ShowAlertAsync("Error", $"Failed to add activity: {ex.Message}");
+            }
         }
 
 

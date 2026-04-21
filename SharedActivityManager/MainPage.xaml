@@ -52,6 +52,12 @@
                         TextColor="White"
                         CornerRadius="8"
                         HorizontalOptions="FillAndExpand"/>
+                <Button Text="🧪 Test Decorator"
+        Clicked="OnTestDecoratorClicked"
+        BackgroundColor="#9C27B0"
+        TextColor="White"
+        CornerRadius="8"
+        HeightRequest="40"/>
             </HorizontalStackLayout>
         </VerticalStackLayout>
 

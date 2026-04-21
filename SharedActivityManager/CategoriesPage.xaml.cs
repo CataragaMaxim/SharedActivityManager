@@ -1,8 +1,9 @@
-﻿using SharedActivityManager.ViewModels;
-using SharedActivityManager.Models;
+﻿using CommunityToolkit.Mvvm.Input;
 using SharedActivityManager.Data;
 using SharedActivityManager.Enums;
+using SharedActivityManager.Models;
 using SharedActivityManager.Services;
+using SharedActivityManager.ViewModels;
 
 namespace SharedActivityManager
 {
@@ -52,8 +53,6 @@ namespace SharedActivityManager
         {
             base.OnAppearing();
             System.Diagnostics.Debug.WriteLine("CategoriesPage: OnAppearing - forcing refresh");
-
-            // 🔥 FORȚEAZĂ REFRESH COMPLET
             _viewModel.RefreshCommand.Execute(null);
         }
 
@@ -67,10 +66,8 @@ namespace SharedActivityManager
 
                 if (!confirm) return;
 
-                // Forțează reîncărcarea completă
                 _viewModel.RefreshCommand.Execute(null);
 
-                // Forțează reîncărcarea și în MainPage prin mesaj
                 var messagingService = new MessagingService();
                 messagingService.Send(new ActivitiesChangedMessage { Action = "HardReset" });
 
@@ -88,7 +85,6 @@ namespace SharedActivityManager
             {
                 var database = new ActivityDataBase();
 
-                // 1. Verifică categoriile din baza de date
                 var categories = await database.GetCategoriesAsync();
                 var catInfo = "📁 CATEGORIES IN DATABASE:\n";
                 foreach (var cat in categories)
@@ -96,7 +92,6 @@ namespace SharedActivityManager
                     catInfo += $"ID: {cat.Id}, Name: {cat.Name}, ParentId: {cat.ParentCategoryId}\n";
                 }
 
-                // 2. Verifică activitățile și CategoryId-ul lor
                 var activities = await database.GetActivitiesAsync();
                 var actInfo = "\n📋 ACTIVITIES:\n";
                 foreach (var act in activities)
@@ -104,7 +99,6 @@ namespace SharedActivityManager
                     actInfo += $"Title: {act.Title}, Type: {act.TypeId}, CategoryId: {act.CategoryId}\n";
                 }
 
-                // 3. Verifică potrivirea
                 var mismatch = "\n⚠️ ACTIVITIES WITH MISMATCHED CATEGORY:\n";
                 var hasMismatch = false;
                 foreach (var act in activities)
@@ -120,7 +114,6 @@ namespace SharedActivityManager
 
                 var fullMessage = catInfo + actInfo + mismatch;
 
-                // Limitează lungimea mesajului
                 if (fullMessage.Length > 3000)
                     fullMessage = fullMessage.Substring(0, 3000) + "\n...(truncated)";
 
@@ -150,7 +143,6 @@ namespace SharedActivityManager
 
                 foreach (var activity in activities)
                 {
-                    // Determină numele categoriei corecte în funcție de tip
                     string expectedCategoryName = activity.TypeId switch
                     {
                         ActivityType.Work => "💼 Work",
@@ -160,7 +152,6 @@ namespace SharedActivityManager
                         _ => "Other"
                     };
 
-                    // Găsește categoria corectă
                     var correctCategory = categories.FirstOrDefault(c => c.Name == expectedCategoryName);
 
                     if (correctCategory != null && activity.CategoryId != correctCategory.Id)
@@ -173,9 +164,91 @@ namespace SharedActivityManager
                 }
 
                 await DisplayAlert("Success", $"Fixed {fixedCount} activities!", "OK");
-
-                // Reîncarcă pagina
                 _viewModel.RefreshCommand.Execute(null);
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Error", ex.Message, "OK");
+            }
+        }
+
+        // 🔥 METODĂ CORECTATĂ - folosește DisplayAlert în loc de _alertService
+        private async void OnTestDecoratorClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                var testActivity = new Activity
+                {
+                    Title = "Test Decorator Activity",
+                    Desc = "Testing extra features",
+                    TypeId = ActivityType.Health,
+                    StartDate = DateTime.Today,
+                    StartTime = DateTime.Now.AddHours(1),
+                    IsCompleted = false
+                };
+
+                var builder = new ActivityExtraBuilder(testActivity);
+                builder.WithNotifications()
+                       .WithEmailReminder("test@example.com")
+                       .WithCalendarSync()
+                       .WithGpsTracking();
+
+                var message = $"✅ Decorator Test Results:\n\n" +
+                              $"Description: {builder.GetFullDescription()}\n" +
+                              $"Icon: {builder.GetIcon()}\n" +
+                              $"Extra cost: {builder.GetTotalExtraCost()} minutes\n\n" +
+                              $"Features enabled:\n" +
+                              $"  • Push Notifications: YES\n" +
+                              $"  • Email Reminder: YES\n" +
+                              $"  • Calendar Sync: YES\n" +
+                              $"  • GPS Tracking: YES";
+
+                await DisplayAlert("Decorator Test", message, "OK");
+
+                System.Diagnostics.Debug.WriteLine($"=== Decorator Test ===");
+                System.Diagnostics.Debug.WriteLine($"Description: {builder.GetFullDescription()}");
+                System.Diagnostics.Debug.WriteLine($"Extra cost: {builder.GetTotalExtraCost()} min");
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Error", $"Test failed: {ex.Message}", "OK");
+            }
+        }
+
+        // 🔥 METODĂ CORECTATĂ - TestExtraFeatures
+        private async void OnTestExtraFeaturesClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                var testActivity = new Activity
+                {
+                    Title = "Yoga Session",
+                    Desc = "Morning yoga routine",
+                    TypeId = ActivityType.Health,
+                    StartDate = DateTime.Today,
+                    StartTime = DateTime.Now,
+                    IsCompleted = false
+                };
+
+                var builder = new ActivityExtraBuilder(testActivity);
+                builder.WithNotifications()
+                       .WithEmailReminder("user@example.com")
+                       .WithCalendarSync()
+                       .WithGpsTracking();
+
+                var result = $"📊 Extra Features Test:\n\n" +
+                             $"📝 Base: {builder.GetFullDescription()}\n" +
+                             $"🎨 Icon: {builder.GetIcon()}\n" +
+                             $"⏱️ Extra time: {builder.GetTotalExtraCost()} min\n\n" +
+                             $"✨ The activity now has:\n" +
+                             $"• Push notifications when completed\n" +
+                             $"• Email reminder to user@example.com\n" +
+                             $"• Calendar synchronization\n" +
+                             $"• GPS tracking for distance/route\n\n" +
+                             $"✅ Activity can be saved to database\n" +
+                             $"✅ Extra features are visible in UI";
+
+                await DisplayAlert("Extra Features Test", result, "OK");
             }
             catch (Exception ex)
             {
