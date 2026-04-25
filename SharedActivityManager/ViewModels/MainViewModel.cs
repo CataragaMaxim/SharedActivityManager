@@ -11,6 +11,7 @@ using SharedActivityManager.Repositories;
 using SharedActivityManager.Services;
 using SharedActivityManager.Services.Commands;
 using SharedActivityManager.Services.Flyweight;
+using SharedActivityManager.Services.Iterators;
 using SharedActivityManager.Services.Memento;
 using SharedActivityManager.Services.Observers;
 using SharedActivityManager.Services.Proxies;
@@ -143,6 +144,28 @@ namespace SharedActivityManager.ViewModels
         [ObservableProperty]
         private bool _showHistoryBrowser;
 
+        private ActivityCollection _activityCollection;
+
+        // Adaugă aceste proprietăți în MainViewModel
+
+        [ObservableProperty]
+        private IActivityIterator _currentIterator;
+
+        [ObservableProperty]
+        private int _currentPageNumber = 1;
+
+        [ObservableProperty]
+        private int _totalPages = 1;
+
+        [ObservableProperty]
+        private bool _hasNextPage = false;
+
+        [ObservableProperty]
+        private bool _hasPreviousPage = false;
+
+        [ObservableProperty]
+        private int _pageSize = 10; // Câte activități pe pagină
+
 
         // ========== PROPRIETĂȚI CALCULATE ==========
         public DateTime CombinedStartDateTime => SelectedStartDate.Add(SelectedStartTime);
@@ -173,6 +196,7 @@ namespace SharedActivityManager.ViewModels
             var notificationService = PlatformBridge.Instance.NotificationService;
             var alertService = new AlertService();
             var messagingService = new MessagingService();
+            _pageSize = 10; // 10 activități pe pagină
 
             // 🔥 CREEAZĂ LANȚUL DE PROXY-URI
             // Cache -> Security -> Virtual -> Real
@@ -231,6 +255,152 @@ namespace SharedActivityManager.ViewModels
             LoadSavedRingtone();
             UpdateNextReminderPreview();
             Task.Run(async () => await RestoreAlarmsAsync());
+        }
+
+        private void InitializeIterator()
+        {
+            _activityCollection = new ActivityCollection(Activities.ToList());
+            _currentIterator = _activityCollection.CreateIterator();
+            UpdatePaginationInfo();
+        }
+
+        private void UpdatePaginationInfo()
+        {
+            if (_currentIterator is PagedActivityIterator pagedIterator)
+            {
+                TotalPages = pagedIterator.TotalPages;
+                CurrentPageNumber = pagedIterator.CurrentPage + 1;
+                HasNextPage = pagedIterator.HasNextPage;
+                HasPreviousPage = pagedIterator.HasPreviousPage;
+            }
+        }
+
+        [RelayCommand]
+        private void NextPage()
+        {
+            System.Diagnostics.Debug.WriteLine("NextPage command executed");
+
+            if (_currentIterator is PagedActivityIterator pagedIterator && pagedIterator.HasNextPage)
+            {
+                int oldPage = pagedIterator.CurrentPage;
+                pagedIterator.GoToPage(oldPage + 1);
+
+                System.Diagnostics.Debug.WriteLine($"Expected new page: {oldPage + 1}, Actual: {pagedIterator.CurrentPage}");
+
+                RefreshFromIterator();
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("Cannot go to next page - no more pages");
+            }
+        }
+
+        [RelayCommand]
+        private void PreviousPage()
+        {
+            System.Diagnostics.Debug.WriteLine("PreviousPage command executed");
+
+            if (_currentIterator is PagedActivityIterator pagedIterator && pagedIterator.HasPreviousPage)
+            {
+                // Mergi la pagina anterioară
+                pagedIterator.GoToPage(pagedIterator.CurrentPage - 1);
+
+                // 🔥 REÎNCARCĂ DOAR NOUA PAGINĂ
+                RefreshFromIterator();
+
+                System.Diagnostics.Debug.WriteLine($"Moved to page {CurrentPageNumber} of {TotalPages}");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("Cannot go to previous page - no previous pages");
+            }
+        }
+
+        [RelayCommand]
+        private void ApplyFilter(string filterType)
+        {
+            System.Diagnostics.Debug.WriteLine($"ApplyFilter command executed: {filterType}");
+
+            // Obține toate activitățile din sursa originală
+            // Notă: Trebuie să ai o listă completă salvată
+            // Vom folosi _allActivities pentru asta
+
+            // Dacă nu ai _allActivities, încarcă din nou din DB
+            Task.Run(async () =>
+            {
+                var allActivities = await _activityService.GetActivitiesAsync();
+                var sortedActivities = _sortContext.Sort(allActivities);
+
+                List<Activity> filteredActivities;
+
+                switch (filterType)
+                {
+                    case "Work":
+                        filteredActivities = sortedActivities.Where(a => a.TypeId == ActivityType.Work).ToList();
+                        break;
+                    case "Completed":
+                        filteredActivities = sortedActivities.Where(a => a.IsCompleted).ToList();
+                        break;
+                    case "Incomplete":
+                        filteredActivities = sortedActivities.Where(a => !a.IsCompleted).ToList();
+                        break;
+                    default:
+                        filteredActivities = sortedActivities;
+                        break;
+                }
+
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    var collection = new ActivityCollection(filteredActivities);
+                    _currentIterator = collection.CreatePagedIterator(_pageSize, 0);
+                    RefreshFromIterator();
+
+                    System.Diagnostics.Debug.WriteLine($"Filter applied: {filterType}, {filteredActivities.Count} total, {TotalPages} pages");
+                });
+            });
+        }
+
+        private void RefreshFromIterator()
+        {
+            if (_currentIterator == null) return;
+
+            var items = new List<Activity>();
+
+            // 🔥 VERIFICĂ DACĂ E ITERATOR CU PAGINARE
+            if (_currentIterator is PagedActivityIterator pagedIterator)
+            {
+                // Pentru iterator cu paginare, trebuie să extragem DOAR elementele din pagina curentă
+                // pagedIterator.MoveNext() va parcurge doar pagina curentă (dacă implementarea e corectă)
+                pagedIterator.Reset();
+                while (pagedIterator.MoveNext())
+                {
+                    items.Add(pagedIterator.Current);
+                }
+
+                // Actualizează informațiile de paginare
+                TotalPages = pagedIterator.TotalPages;
+                CurrentPageNumber = pagedIterator.CurrentPage + 1;
+                HasNextPage = pagedIterator.HasNextPage;
+                HasPreviousPage = pagedIterator.HasPreviousPage;
+
+                System.Diagnostics.Debug.WriteLine($"Page {CurrentPageNumber} of {TotalPages}, showing {items.Count} items");
+            }
+            else
+            {
+                // Pentru iteratori normali, parcurge toate elementele
+                _currentIterator.Reset();
+                while (_currentIterator.MoveNext())
+                {
+                    items.Add(_currentIterator.Current);
+                }
+
+                TotalPages = 1;
+                CurrentPageNumber = 1;
+                HasNextPage = false;
+                HasPreviousPage = false;
+            }
+
+            Activities = new ObservableCollection<Activity>(items);
         }
 
         private void OnHistoryChanged(object sender, HistoryChangedEventArgs e)
@@ -668,11 +838,19 @@ namespace SharedActivityManager.ViewModels
                 System.Diagnostics.Debug.WriteLine("MainViewModel: Loading activities...");
                 var activitiesFromDb = await _activityService.GetActivitiesAsync();
 
-                // 🔥 APLICĂ SORTAREA CURENTĂ
+                // Aplică sortarea curentă
                 var sortedActivities = _sortContext.Sort(activitiesFromDb);
-                Activities = new ObservableCollection<Activity>(sortedActivities);
 
-                System.Diagnostics.Debug.WriteLine($"MainViewModel: Loaded {Activities.Count} activities");
+                System.Diagnostics.Debug.WriteLine($"Total activities: {sortedActivities.Count}");
+
+                // Creează colecția și iteratorul cu paginare
+                var collection = new ActivityCollection(sortedActivities);
+                _currentIterator = collection.CreatePagedIterator(_pageSize, 0);
+
+                // 🔥 REFRESH - va extrage doar pagina curentă
+                RefreshFromIterator();
+
+                System.Diagnostics.Debug.WriteLine($"MainViewModel: Loaded {Activities.Count} activities on page {CurrentPageNumber} of {TotalPages}");
             }
             catch (Exception ex)
             {
@@ -680,6 +858,8 @@ namespace SharedActivityManager.ViewModels
                 await _alertService.ShowAlertAsync("Error", $"Failed to load activities: {ex.Message}");
             }
         }
+
+
 
         [RelayCommand]
         private async Task AddActivity()
