@@ -3,6 +3,7 @@ using SharedActivityManager.Models;
 using SharedActivityManager.Enums;
 using SharedActivityManager.Services;
 using SharedActivityManager.Services.Strategies;
+using SharedActivityManager.Services.Memento;
 
 namespace SharedActivityManager;
 
@@ -259,6 +260,90 @@ public partial class MainPage : ContentPage
         if (sender is Picker picker && picker.SelectedItem is ISortStrategy strategy)
         {
             _viewModel.ChangeSortStrategyCommand.Execute(strategy);
+        }
+    }
+
+    private void OnSnapshotSelected(object sender, SelectionChangedEventArgs e)
+    {
+        if (e.CurrentSelection.FirstOrDefault() is IActivityMemento selectedSnapshot)
+        {
+            _viewModel.RestoreSnapshotCommand.Execute(selectedSnapshot);
+
+            // Deselectează
+            if (sender is CollectionView cv)
+            {
+                cv.SelectedItem = null;
+            }
+        }
+    }
+
+    private async void OnMenuClicked(object sender, EventArgs e)
+    {
+        var action = await DisplayActionSheet("Menu", "Cancel", null,
+            "📋 Create New Activity",
+            "━━━ Quick Create ━━━",
+            "💼 Work",
+            "🏃 Sport",
+            "📚 Study",
+            "🛒 Shopping",
+            "━━━ Undo/Redo ━━━",
+            "↩️ Undo",
+            "↪️ Redo",
+            "━━━ Time Travel ━━━",
+            "⏪ Back in Time",
+            "⏩ Forward in Time",
+            "📜 History Browser",
+            "━━━ Navigation ━━━",
+            "📁 Categories",
+            "👥 Shared Activities",
+            "⚙️ Settings",
+            "━━━ Tests ━━━",
+            "🧪 Test Decorator");
+
+        switch (action)
+        {
+            case "📋 Create New Activity":
+                OnModalOpen(sender, e);
+                break;
+            case "💼 Work":
+                OnCreateWorkClicked(sender, e);
+                break;
+            case "🏃 Sport":
+                OnCreateSportClicked(sender, e);
+                break;
+            case "📚 Study":
+                OnCreateStudyClicked(sender, e);
+                break;
+            case "🛒 Shopping":
+                OnCreateShoppingClicked(sender, e);
+                break;
+            case "↩️ Undo":
+                if (_viewModel.CanUndo) _viewModel.UndoCommand.Execute(null);
+                break;
+            case "↪️ Redo":
+                if (_viewModel.CanRedo) _viewModel.RedoCommand.Execute(null);
+                break;
+            case "⏪ Back in Time":
+                if (_viewModel.CanGoBackInTime) _viewModel.GoBackInTimeCommand.Execute(null);
+                break;
+            case "⏩ Forward in Time":
+                if (_viewModel.CanGoForwardInTime) _viewModel.GoForwardInTimeCommand.Execute(null);
+                break;
+            case "📜 History Browser":
+                _viewModel.ToggleHistoryBrowserCommand.Execute(null);
+                break;
+            case "📁 Categories":
+                OnCategoriesClicked(sender, e);
+                break;
+            case "👥 Shared Activities":
+                OnSharedActivitiesClicked(sender, e);
+                break;
+            case "⚙️ Settings":
+                OnSettingsClicked(sender, e);
+                break;
+            case "🧪 Test Decorator":
+                OnTestDecoratorClicked(sender, e);
+                break;
         }
     }
 }

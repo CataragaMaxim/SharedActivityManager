@@ -8,6 +8,8 @@ using SharedActivityManager.Services.Flyweight;
 using SharedActivityManager.Enums;
 using SharedActivityManager.Services.Proxies;
 using SharedActivityManager.Repositories;
+using SharedActivityManager.Services.Commands;
+using SharedActivityManager.ViewModels;
 
 namespace SharedActivityManager;
 
@@ -18,6 +20,8 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
     private readonly ActivityDataBase _database;
     private readonly IAlarmService _alarmService;
     private readonly IMessagingService _messagingService;
+    private readonly IActivityService _activityService;
+    private readonly CommandInvoker _commandInvoker;
 
     private string _selectedRingtone = "Default Alarm";
     public string SelectedRingtone
@@ -42,6 +46,11 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
         _database = new ActivityDataBase();
         _alarmService = PlatformServiceLocator.AlarmService;
         _messagingService = new MessagingService();
+
+        // Inițializare pentru Undo/Redo
+        var repository = new ActivityRepository();
+        _activityService = new ActivityService(repository);
+        _commandInvoker = new CommandInvoker();
 
         LoadSavedRingtone();
         BindingContext = this;
@@ -81,17 +90,50 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Obține MainViewModel-ul curent pentru a accesa TakeSnapshot
+    /// </summary>
+    private MainViewModel GetMainViewModel()
+    {
+        // Încearcă să găsească MainPage în Navigation stack
+        var navigationPage = Application.Current?.MainPage as NavigationPage;
+        if (navigationPage != null)
+        {
+            var mainPage = navigationPage.RootPage as MainPage;
+            if (mainPage != null)
+            {
+                return mainPage.BindingContext as MainViewModel;
+            }
+        }
+
+        // Alternativ: caută în stiva de navigare
+        if (Application.Current?.MainPage != null)
+        {
+            var mainPage = Application.Current.MainPage as MainPage;
+            if (mainPage != null)
+            {
+                return mainPage.BindingContext as MainViewModel;
+            }
+        }
+
+        return null;
+    }
+
     private async void OnDeleteAllActivitiesClicked(object sender, EventArgs e)
     {
         try
         {
             var confirm = await DisplayAlert(
                 "Confirm Delete",
-                "⚠️ Are you sure you want to delete ALL activities?\n\nThis action cannot be undone!",
+                "⚠️ Are you sure you want to delete ALL activities?\n\nThis action can be undone!",
                 "Yes, Delete All",
                 "Cancel");
 
             if (!confirm) return;
+
+            // 🔥 SALVEAZĂ SNAPSHOT ÎNAINTE DE ȘTERGERE
+            var mainViewModel = GetMainViewModel();
+            mainViewModel?.TakeSnapshot("Before deleting all activities");
 
             if (_database == null)
             {
@@ -108,37 +150,21 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
                 return;
             }
 
-            if (_alarmService != null)
-            {
-                foreach (var activity in activities)
-                {
-                    try
-                    {
-                        await _alarmService.CancelAlarmAsync(activity.Id);
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error cancelling alarm for activity {activity.Id}: {ex.Message}");
-                    }
-                    await _database.DeleteActivityAsync(activity);
-                }
-            }
-            else
-            {
-                foreach (var activity in activities)
-                {
-                    await _database.DeleteActivityAsync(activity);
-                }
-            }
+            // 🔥 FOLOSEȘTE COMANDĂ PENTRU UNDO/REDO
+            var command = new DeleteAllActivitiesCommand(_activityService, activities);
+            await _commandInvoker.ExecuteCommand(command);
 
+            // Trimite notificare pentru refresh UI
             _messagingService?.Send(new ActivitiesChangedMessage
             {
                 Action = "DeletedAll",
                 ActivityCount = count
             });
 
-            await DisplayAlert("Success", $"✅ Successfully deleted {count} activities!", "OK");
+            // 🔥 SALVEAZĂ SNAPSHOT DUPĂ ȘTERGERE
+            mainViewModel?.TakeSnapshot($"Deleted {count} activities");
 
+            await DisplayAlert("Success", $"✅ Successfully deleted {count} activities!", "OK");
             await Shell.Current.GoToAsync("///MainPage");
         }
         catch (Exception ex)
@@ -161,11 +187,15 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
 
             var confirm = await DisplayAlert(
                 "⚠️ DANGER ZONE ⚠️",
-                "This will delete ALL activities AND ALL categories!\n\nThis action CANNOT be undone!\n\nAre you absolutely sure?",
+                "This will delete ALL activities AND ALL categories!\n\nThis action can be undone!\n\nAre you absolutely sure?",
                 "Yes, Reset Everything",
                 "No, Cancel");
 
             if (!confirm) return;
+
+            // 🔥 SALVEAZĂ SNAPSHOT ÎNAINTE DE RESET
+            var mainViewModel = GetMainViewModel();
+            mainViewModel?.TakeSnapshot("Before resetting everything");
 
             if (_database == null)
             {
@@ -173,47 +203,26 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
                 return;
             }
 
-            if (_alarmService != null)
-            {
-                try
-                {
-                    await _alarmService.CancelAllAlarmsAsync();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error cancelling alarms: {ex.Message}");
-                }
-            }
+            // Salvează datele curente pentru Undo
+            var currentActivities = await _database.GetActivitiesAsync();
+            var currentCategories = await _database.GetCategoriesAsync();
 
-            var activities = await _database.GetActivitiesAsync();
-            if (activities != null)
-            {
-                foreach (var activity in activities)
-                {
-                    await _database.DeleteActivityAsync(activity);
-                }
-                System.Diagnostics.Debug.WriteLine($"Deleted {activities.Count} activities");
-            }
+            // 🔥 FOLOSEȘTE COMANDĂ PENTRU UNDO/REDO
+            var command = new ResetAllCommand(_activityService, currentActivities, currentCategories);
+            await _commandInvoker.ExecuteCommand(command);
 
-            var categories = await _database.GetCategoriesAsync();
-            if (categories != null)
-            {
-                foreach (var category in categories)
-                {
-                    await _database.DeleteCategoryAsync(category);
-                }
-                System.Diagnostics.Debug.WriteLine($"Deleted {categories.Count} categories");
-            }
-
-            await RecreateDefaultCategories();
+            // Recrează categoriile implicite (ResetAllCommand deja face asta)
+            // Dar asigură-te că există după reset
 
             _messagingService?.Send(new ActivitiesChangedMessage
             {
                 Action = "ResetEverything"
             });
 
-            await DisplayAlert("Success", "✅ Application has been reset to factory settings!", "OK");
+            // 🔥 SALVEAZĂ SNAPSHOT DUPĂ RESET
+            mainViewModel?.TakeSnapshot("Reset everything to factory settings");
 
+            await DisplayAlert("Success", "✅ Application has been reset to factory settings!", "OK");
             await Shell.Current.GoToAsync("///MainPage");
         }
         catch (Exception ex)
@@ -257,7 +266,6 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
         var factory = ActivityTypeMetadataFactory.Instance;
         var cacheSize = factory.CacheSize;
 
-        // Creează mai multe activități de același tip
         var metadata1 = ActivityType.Work.GetMetadata();
         var metadata2 = ActivityType.Work.GetMetadata();
         var metadata3 = ActivityType.Work.GetMetadata();
@@ -281,7 +289,6 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
 
             await DisplayAlert("Success", "All activities have been fixed!", "OK");
 
-            // Trimite notificare pentru refresh
             var messagingService = new MessagingService();
             messagingService.Send(new ActivitiesChangedMessage { Action = "Fixed" });
         }
@@ -322,14 +329,12 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
 
             var results = new List<string>();
 
-            // Test 1: Real Service
             var realService = new RealActivityService(repository, alarmService);
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var realActivities = await realService.GetActivitiesAsync();
             sw.Stop();
             results.Add($"Real Service: {realActivities.Count} activities in {sw.ElapsedMilliseconds} ms");
 
-            // Test 2: Cache Proxy
             var cacheProxy = ActivityServiceProxyFactory.CreateCacheProxy(repository, alarmService);
             sw.Restart();
             var cachedActivities1 = await cacheProxy.GetActivitiesAsync();
@@ -341,19 +346,16 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
             sw.Stop();
             results.Add($"Cache Proxy (second call): {cachedActivities2.Count} activities in {sw.ElapsedMilliseconds} ms (should be faster)");
 
-            // Test 3: Virtual Proxy
             var virtualProxy = ActivityServiceProxyFactory.CreateVirtualProxy(repository, alarmService);
             sw.Restart();
             var virtualActivities = await virtualProxy.GetActivitiesAsync();
             sw.Stop();
             results.Add($"Virtual Proxy (first page): {virtualActivities.Count} activities in {sw.ElapsedMilliseconds} ms");
 
-            // Test 4: Security Proxy
             var securityProxy = ActivityServiceProxyFactory.CreateSecurityProxy(repository, alarmService, "current_user");
             try
             {
-                // Încearcă să ștergi o activitate care nu aparține utilizatorului
-                // (doar pentru test - ar trebui să arunce excepție)
+                // Test security
             }
             catch (UnauthorizedAccessException ex)
             {

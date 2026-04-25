@@ -11,6 +11,7 @@ using SharedActivityManager.Repositories;
 using SharedActivityManager.Services;
 using SharedActivityManager.Services.Commands;
 using SharedActivityManager.Services.Flyweight;
+using SharedActivityManager.Services.Memento;
 using SharedActivityManager.Services.Observers;
 using SharedActivityManager.Services.Proxies;
 using SharedActivityManager.Services.Strategies;
@@ -125,6 +126,23 @@ namespace SharedActivityManager.ViewModels
         [ObservableProperty]
         private string _redoCommandName;
 
+        private readonly ActivityMementoCaretaker _mementoCaretaker;
+
+        [ObservableProperty]
+        private bool _canGoBackInTime;
+
+        [ObservableProperty]
+        private bool _canGoForwardInTime;
+
+        [ObservableProperty]
+        private string _currentSnapshotInfo;
+
+        [ObservableProperty]
+        private List<IActivityMemento> _historySnapshots;
+
+        [ObservableProperty]
+        private bool _showHistoryBrowser;
+
 
         // ========== PROPRIETĂȚI CALCULATE ==========
         public DateTime CombinedStartDateTime => SelectedStartDate.Add(SelectedStartTime);
@@ -178,6 +196,12 @@ namespace SharedActivityManager.ViewModels
             _commandInvoker = new CommandInvoker();
             _commandInvoker.CommandExecuted += OnCommandExecuted;
 
+            _mementoCaretaker = new ActivityMementoCaretaker();
+            _mementoCaretaker.HistoryChanged += OnHistoryChanged;
+            _historySnapshots = new List<IActivityMemento>();
+
+            TakeSnapshot("Application started");
+
             if (_activityService is IActivitySubject subject)
             {
                 subject.Attach(this);
@@ -207,6 +231,130 @@ namespace SharedActivityManager.ViewModels
             LoadSavedRingtone();
             UpdateNextReminderPreview();
             Task.Run(async () => await RestoreAlarmsAsync());
+        }
+
+        private void OnHistoryChanged(object sender, HistoryChangedEventArgs e)
+        {
+            CanGoBackInTime = _mementoCaretaker.CanGoBack;
+            CanGoForwardInTime = _mementoCaretaker.CanGoForward;
+
+            var current = _mementoCaretaker.GetCurrentSnapshot();
+            CurrentSnapshotInfo = current != null ? $"Current: {current.Name}" : "No history";
+
+            // Actualizează lista pentru UI
+            HistorySnapshots = _mementoCaretaker.GetHistory();
+
+            System.Diagnostics.Debug.WriteLine($"[Memento] History changed - CanGoBack: {CanGoBackInTime}, CanGoForward: {CanGoForwardInTime}");
+        }
+
+        /// <summary>
+        /// Salvează un snapshot al stării curente
+        /// </summary>
+        public void TakeSnapshot(string description)
+        {
+            _mementoCaretaker.SaveSnapshot(Activities.ToList(), description);
+        }
+
+        /// <summary>
+        /// Comandă pentru a merge înapoi în istoric
+        /// </summary>
+        [RelayCommand]
+        private async Task GoBackInTime()
+        {
+            System.Diagnostics.Debug.WriteLine("[Memento] Going back in time");
+
+            var restoredActivities = _mementoCaretaker.GoBack();
+            if (restoredActivities != null)
+            {
+                await RestoreActivities(restoredActivities);
+            }
+        }
+
+        /// <summary>
+        /// Comandă pentru a merge înainte în istoric
+        /// </summary>
+        [RelayCommand]
+        private async Task GoForwardInTime()
+        {
+            System.Diagnostics.Debug.WriteLine("[Memento] Going forward in time");
+
+            var restoredActivities = _mementoCaretaker.GoForward();
+            if (restoredActivities != null)
+            {
+                await RestoreActivities(restoredActivities);
+            }
+        }
+
+        /// <summary>
+        /// Comandă pentru a restaura un snapshot specific
+        /// </summary>
+        [RelayCommand]
+        private async Task RestoreSnapshot(IActivityMemento snapshot)
+        {
+            if (snapshot == null) return;
+
+            System.Diagnostics.Debug.WriteLine($"[Memento] Restoring snapshot: {snapshot.Name}");
+
+            // 🔥 FOLOSEȘTE GetHistory() ÎN LOC DE HistorySnapshots
+            var history = _mementoCaretaker.GetHistory();
+            var snapshotIndex = history.IndexOf(snapshot);
+
+            var restoredActivities = _mementoCaretaker.RestoreSnapshot(snapshotIndex);
+            if (restoredActivities != null)
+            {
+                await RestoreActivities(restoredActivities);
+            }
+
+            ShowHistoryBrowser = false;
+        }
+
+        /// <summary>
+        /// Comandă pentru a arăta/ascunde History Browser
+        /// </summary>
+        [RelayCommand]
+        private void ToggleHistoryBrowser()
+        {
+            ShowHistoryBrowser = !ShowHistoryBrowser;
+            if (ShowHistoryBrowser)
+            {
+                HistorySnapshots = _mementoCaretaker.GetHistory();
+            }
+        }
+
+        /// <summary>
+        /// Comandă pentru a curăța istoricul
+        /// </summary>
+        [RelayCommand]
+        private void ClearHistory()
+        {
+            _mementoCaretaker.Clear();
+            TakeSnapshot("History cleared");
+        }
+
+        /// <summary>
+        /// Restaurează lista de activități și salvează în baza de date
+        /// </summary>
+        private async Task RestoreActivities(List<Activity> restoredActivities)
+        {
+            // Curăță toate activitățile existente
+            var currentActivities = await _activityService.GetActivitiesAsync();
+            foreach (var activity in currentActivities)
+            {
+                await _activityService.DeleteActivityAsync(activity);
+            }
+
+            // Adaugă activitățile restaurate
+            foreach (var activity in restoredActivities)
+            {
+                var newActivity = activity.DeepCopy();
+                newActivity.Id = 0; // Reset ID pentru a fi inserate ca noi
+                await _activityService.SaveActivityAsync(newActivity);
+            }
+
+            // Reîncarcă UI-ul
+            await LoadActivitiesAsync();
+
+            await _alertService.ShowAlertAsync("History", "State restored successfully!");
         }
 
         private void OnCommandExecuted(object sender, CommandExecutedEventArgs e)
@@ -568,8 +716,10 @@ namespace SharedActivityManager.ViewModels
                 var command = new CreateActivityCommand(_activityService, newActivity);
                 await _commandInvoker.ExecuteCommand(command);
 
+
                 await LoadActivitiesAsync();
                 ResetForm();
+                TakeSnapshot($"Added activity: {NewTaskTitle}");
             }
             catch (Exception ex)
             {
@@ -650,6 +800,7 @@ namespace SharedActivityManager.ViewModels
                 ResetForm();
 
                 await _alertService.ShowAlertAsync("Success", "Activity updated successfully!");
+                TakeSnapshot($"Updated activity: {SelectedActivity?.Title}");
             }
             catch (Exception ex)
             {
@@ -671,6 +822,7 @@ namespace SharedActivityManager.ViewModels
                 var command = new DeleteActivityCommand(_activityService, activity);
                 await _commandInvoker.ExecuteCommand(command);
                 await LoadActivitiesAsync();
+                TakeSnapshot($"Deleted activity: {activity.Title}");
             }
             catch (Exception ex)
             {
@@ -712,6 +864,7 @@ namespace SharedActivityManager.ViewModels
                     var command = new CompleteActivityCommand(_activityService, activity, newStatus);
                     await _commandInvoker.ExecuteCommand(command);
                     await LoadActivitiesAsync();
+                    TakeSnapshot($"{(activity.IsCompleted ? "Completed" : "Incompleted")}: {activity.Title}");
                 }
                 catch (Exception ex)
                 {

@@ -4,125 +4,100 @@
              xmlns:viewmodels="clr-namespace:SharedActivityManager.ViewModels"
              xmlns:models="clr-namespace:SharedActivityManager.Models"
              x:Class="SharedActivityManager.MainPage"
-             x:DataType="viewmodels:MainViewModel"
              Title="Activity List">
 
     <Grid RowDefinitions="Auto,Auto,*">
 
-        <!-- Header cu butoane -->
-        <VerticalStackLayout Grid.Row="0" Padding="20" Spacing="10">
-            <Grid ColumnDefinitions="*, Auto, Auto" ColumnSpacing="10">
-                <Label Grid.Column="0" 
-                       Text="Activity List"
-                       FontSize="28"
-                       FontAttributes="Bold"
-                       TextColor="#2196F3"
-                       VerticalOptions="Center"/>
+        <!-- ========== BARA DE TOOLS ========== -->
+        <HorizontalStackLayout Grid.Row="0" 
+                               Padding="15,10" 
+                               Spacing="8"
+                               BackgroundColor="#F5F5F5">
 
-                <Button Grid.Column="1"
-                        Text="👥 Shared"
-                        BackgroundColor="#9C27B0"
-                        TextColor="White"
-                        CornerRadius="8"
-                        Padding="15,10"
-                        Clicked="OnSharedActivitiesClicked"/>
+            <Label Text="📋 Activities"
+                   FontSize="18"
+                   FontAttributes="Bold"
+                   TextColor="#2196F3"
+                   VerticalOptions="Center"/>
 
-                <Button Grid.Column="2"
-                        Text="⚙️"
-                        BackgroundColor="#607D8B"
-                        TextColor="White"
-                        CornerRadius="8"
-                        WidthRequest="50"
-                        Clicked="OnSettingsClicked"/>
-            </Grid>
+            <!-- Buton Meniu simplu -->
+            <Button Text="☰ Menu"
+                    Clicked="OnMenuClicked"
+                    BackgroundColor="#673AB7"
+                    TextColor="White"
+                    CornerRadius="8"
+                    Padding="15,8"
+                    HeightRequest="35"/>
 
-            <HorizontalStackLayout Spacing="10">
-                <Button Text="📁 Categories"
-                        Clicked="OnCategoriesClicked"
-                        BackgroundColor="#FF9800"
-                        TextColor="White"
-                        CornerRadius="8"
-                        Padding="15,10"
-                        HorizontalOptions="FillAndExpand"/>
+            <!-- Sortare -->
+            <Label Text="Sort:"
+                   FontSize="12"
+                   VerticalOptions="Center"
+                   Margin="10,0,0,0"/>
 
-                <!-- 🔥 BUTON PRINCIPAL - Deschide meniul cu tipuri -->
-                <Button Text="+ Create New Activity"
-                        Clicked="OnModalOpen"
-                        BackgroundColor="#4CAF50"
-                        TextColor="White"
-                        CornerRadius="8"
-                        HorizontalOptions="FillAndExpand"/>
-                <Button Text="🧪 Test Decorator"
-                        Clicked="OnTestDecoratorClicked"
-                        BackgroundColor="#9C27B0"
-                        TextColor="White"
-                        CornerRadius="8"
-                        HeightRequest="40"/>
-            </HorizontalStackLayout>
+            <Picker Title="Sort by..."
+                    ItemsSource="{Binding AvailableSortStrategies}"
+                    ItemDisplayBinding="{Binding Name}"
+                    SelectedItem="{Binding SelectedSortStrategy}"
+                    SelectedIndexChanged="OnSortStrategyChanged"
+                    WidthRequest="100"
+                    HeightRequest="35"/>
 
-            <!-- Adaugă în header, lângă butoanele existente -->
-            <HorizontalStackLayout Grid.Row="0" Padding="20,10" Spacing="10">
+            <Button Text="🔼"
+                    Command="{Binding ToggleSortOrderCommand}"
+                    BackgroundColor="#2196F3"
+                    TextColor="White"
+                    CornerRadius="8"
+                    WidthRequest="35"
+                    HeightRequest="35"/>
 
-                <!-- Label pentru informații sortare -->
-                <Label Text="{Binding CurrentSortInfo}"
-                       FontSize="12"
-                       TextColor="#666666"
-                       VerticalOptions="Center"/>
+            <Button Text="↩️"
+                    Command="{Binding UndoCommand}"
+                    IsEnabled="{Binding CanUndo}"
+                    BackgroundColor="#2196F3"
+                    TextColor="White"
+                    CornerRadius="8"
+                    WidthRequest="35"
+                    HeightRequest="35"/>
 
-                <!-- Picker pentru selectarea strategiei -->
-                <Picker Title="Sort by..."
-                        ItemsSource="{Binding AvailableSortStrategies}"
-                        ItemDisplayBinding="{Binding Name}"
-                        SelectedItem="{Binding SelectedSortStrategy}"
-                        SelectedIndexChanged="OnSortStrategyChanged"
-                        WidthRequest="150"
-                        HeightRequest="40"/>
+            <Button Text="↪️"
+                    Command="{Binding RedoCommand}"
+                    IsEnabled="{Binding CanRedo}"
+                    BackgroundColor="#2196F3"
+                    TextColor="White"
+                    CornerRadius="8"
+                    WidthRequest="35"
+                    HeightRequest="35"/>
 
-                <!-- Buton pentru toggle ordine -->
-                <Button Text="🔼"
-                        Command="{Binding ToggleSortOrderCommand}"
-                        BackgroundColor="#2196F3"
-                        TextColor="White"
-                        CornerRadius="8"
-                        WidthRequest="50"
-                        HeightRequest="40"/>
+            <Button Text="👥"
+                    Clicked="OnSharedActivitiesClicked"
+                    BackgroundColor="#9C27B0"
+                    TextColor="White"
+                    CornerRadius="8"
+                    WidthRequest="35"
+                    HeightRequest="35"/>
 
-            </HorizontalStackLayout>
-            
-            <HorizontalStackLayout Spacing="10" HorizontalOptions="End">
-                <Label Text="{Binding UndoCommandName, StringFormat='Undo: {0}'}"
-                       FontSize="11"
-                       TextColor="#666666"
-                       IsVisible="{Binding CanUndo}"/>
-                
-                <Button Text="↩️ Undo"
-                        Command="{Binding UndoCommand}"
-                        IsEnabled="{Binding CanUndo}"
-                        BackgroundColor="#2196F3"
-                        TextColor="White"
-                        CornerRadius="8"
-                        Padding="15,10"/>
+            <Button Text="⚙️"
+                    Clicked="OnSettingsClicked"
+                    BackgroundColor="#607D8B"
+                    TextColor="White"
+                    CornerRadius="8"
+                    WidthRequest="35"
+                    HeightRequest="35"/>
 
-                <Button Text="↪️ Redo"
-                        Command="{Binding RedoCommand}"
-                        IsEnabled="{Binding CanRedo}"
-                        BackgroundColor="#2196F3"
-                        TextColor="White"
-                        CornerRadius="8"
-                        Padding="15,10"/>
-            </HorizontalStackLayout>
-
-        </VerticalStackLayout>
-
-        <!-- 🔥 BUTOANE RAPIDE (opțional - le poți păstra sau elimina) -->
-        <HorizontalStackLayout Grid.Row="1" Padding="20,0,20,10" Spacing="8">
-            <Button Text="💼 Work" Clicked="OnCreateWorkClicked" BackgroundColor="#2196F3" TextColor="White" CornerRadius="15" HeightRequest="35" FontSize="12"/>
-            <Button Text="🏃 Sport" Clicked="OnCreateSportClicked" BackgroundColor="#4CAF50" TextColor="White" CornerRadius="15" HeightRequest="35" FontSize="12"/>
-            <Button Text="📚 Study" Clicked="OnCreateStudyClicked" BackgroundColor="#FF9800" TextColor="White" CornerRadius="15" HeightRequest="35" FontSize="12"/>
-            <Button Text="🛒 Shopping" Clicked="OnCreateShoppingClicked" BackgroundColor="#9C27B0" TextColor="White" CornerRadius="15" HeightRequest="35" FontSize="12"/>
         </HorizontalStackLayout>
 
-        <!-- Lista activităților -->
+        <!-- ========== BUTON CREARE ACTIVITATE ========== -->
+        <Button Grid.Row="1"
+                Text="+ Create New Activity"
+                Clicked="OnModalOpen"
+                BackgroundColor="#4CAF50"
+                TextColor="White"
+                CornerRadius="8"
+                HeightRequest="45"
+                Margin="15,10"/>
+
+        <!-- ========== LISTA ACTIVITĂȚILOR ========== -->
         <CollectionView Grid.Row="2"
                         ItemsSource="{Binding Activities}"
                         EmptyView="No activities yet. Create your first activity!"
@@ -136,34 +111,31 @@
                             StrokeThickness="1"
                             StrokeShape="RoundRectangle 10"
                             Padding="15"
-                            Margin="5">
-
+                            Margin="10,5">
                         <Grid ColumnDefinitions="*, Auto">
-
                             <VerticalStackLayout Grid.Column="0" Spacing="8">
                                 <Label Text="{Binding Title}" 
-                                       FontSize="18" 
+                                       FontSize="16" 
                                        FontAttributes="Bold"
                                        TextColor="#333333"/>
-
                                 <Label Text="{Binding Desc}" 
-                                       FontSize="14" 
+                                       FontSize="13" 
                                        TextColor="#666666"
+                                       MaxLines="2"
+                                       LineBreakMode="TailTruncation"
                                        IsVisible="{Binding Desc, Converter={StaticResource StringNotNullOrEmpty}}"/>
-
                                 <HorizontalStackLayout Spacing="15">
                                     <Label Text="{Binding TypeId}" 
-                                           FontSize="12" 
+                                           FontSize="11" 
                                            TextColor="#2196F3"/>
                                     <Label Text="{Binding StartDate, StringFormat='{0:dd.MM.yyyy}'}" 
-                                           FontSize="12" 
+                                           FontSize="11" 
                                            TextColor="#FF9800"/>
                                     <Label Text="{Binding StartTime, StringFormat='{0:HH:mm}'}" 
-                                           FontSize="12" 
+                                           FontSize="11" 
                                            TextColor="#4CAF50"/>
                                 </HorizontalStackLayout>
                             </VerticalStackLayout>
-
                             <Button Grid.Column="1"
                                     Text="✓"
                                     BackgroundColor="{Binding IsCompleted, Converter={StaticResource BoolToColorConverter}}"
@@ -178,5 +150,76 @@
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
+
+        <!-- ========== HISTORY BROWSER POPUP ========== -->
+        <Frame Grid.RowSpan="3"
+               IsVisible="{Binding ShowHistoryBrowser}"
+               BackgroundColor="White"
+               CornerRadius="15"
+               Padding="15"
+               Margin="40"
+               HorizontalOptions="Center"
+               VerticalOptions="Center"
+               WidthRequest="350"
+               HeightRequest="450"
+               ZIndex="100">
+
+            <VerticalStackLayout Spacing="10">
+                <Label Text="📜 History Browser"
+                       FontSize="18"
+                       FontAttributes="Bold"
+                       TextColor="#673AB7"
+                       HorizontalOptions="Center"/>
+
+                <Label Text="Click on any snapshot to restore that state"
+                       FontSize="12"
+                       TextColor="#666666"
+                       HorizontalOptions="Center"/>
+
+                <ScrollView HeightRequest="300">
+                    <CollectionView ItemsSource="{Binding HistorySnapshots}"
+                                    SelectionMode="Single"
+                                    SelectionChanged="OnSnapshotSelected">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Stroke="#E0E0E0"
+                                        StrokeThickness="1"
+                                        StrokeShape="RoundRectangle 8"
+                                        Padding="10"
+                                        Margin="5">
+                                    <VerticalStackLayout>
+                                        <Label Text="{Binding Name}"
+                                               FontSize="13"
+                                               FontAttributes="Bold"
+                                               TextColor="#333333"/>
+                                        <Label Text="{Binding Description}"
+                                               FontSize="11"
+                                               TextColor="#666666"/>
+                                        <Label Text="{Binding ActivityCount, StringFormat='📊 {0} activities'}"
+                                               FontSize="11"
+                                               TextColor="#999999"/>
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </ScrollView>
+
+                <Button Text="Close"
+                        Command="{Binding ToggleHistoryBrowserCommand}"
+                        BackgroundColor="#9E9E9E"
+                        TextColor="White"
+                        CornerRadius="8"
+                        HeightRequest="40"/>
+
+                <Button Text="Clear History"
+                        Command="{Binding ClearHistoryCommand}"
+                        BackgroundColor="#F44336"
+                        TextColor="White"
+                        CornerRadius="8"
+                        HeightRequest="40"/>
+            </VerticalStackLayout>
+        </Frame>
+
     </Grid>
 </ContentPage>
