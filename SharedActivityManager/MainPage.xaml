@@ -53,12 +53,42 @@
                         CornerRadius="8"
                         HorizontalOptions="FillAndExpand"/>
                 <Button Text="🧪 Test Decorator"
-        Clicked="OnTestDecoratorClicked"
-        BackgroundColor="#9C27B0"
-        TextColor="White"
-        CornerRadius="8"
-        HeightRequest="40"/>
+                        Clicked="OnTestDecoratorClicked"
+                        BackgroundColor="#9C27B0"
+                        TextColor="White"
+                        CornerRadius="8"
+                        HeightRequest="40"/>
             </HorizontalStackLayout>
+
+            <!-- Adaugă în header, lângă butoanele existente -->
+            <HorizontalStackLayout Grid.Row="0" Padding="20,10" Spacing="10">
+
+                <!-- Label pentru informații sortare -->
+                <Label Text="{Binding CurrentSortInfo}"
+                       FontSize="12"
+                       TextColor="#666666"
+                       VerticalOptions="Center"/>
+
+                <!-- Picker pentru selectarea strategiei -->
+                <Picker Title="Sort by..."
+                        ItemsSource="{Binding AvailableSortStrategies}"
+                        ItemDisplayBinding="{Binding Name}"
+                        SelectedItem="{Binding SelectedSortStrategy}"
+                        SelectedIndexChanged="OnSortStrategyChanged"
+                        WidthRequest="150"
+                        HeightRequest="40"/>
+
+                <!-- Buton pentru toggle ordine -->
+                <Button Text="🔼"
+                        Command="{Binding ToggleSortOrderCommand}"
+                        BackgroundColor="#2196F3"
+                        TextColor="White"
+                        CornerRadius="8"
+                        WidthRequest="50"
+                        HeightRequest="40"/>
+
+            </HorizontalStackLayout>
+
         </VerticalStackLayout>
 
         <!-- 🔥 BUTOANE RAPIDE (opțional - le poți păstra sau elimina) -->

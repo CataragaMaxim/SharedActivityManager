@@ -2,6 +2,7 @@
 using SharedActivityManager.Models;
 using SharedActivityManager.Enums;
 using SharedActivityManager.Services;
+using SharedActivityManager.Services.Strategies;
 
 namespace SharedActivityManager;
 
@@ -250,6 +251,14 @@ public partial class MainPage : ContentPage
         catch (Exception ex)
         {
             await DisplayAlert("Error", $"Test failed: {ex.Message}", "OK");
+        }
+    }
+
+    private void OnSortStrategyChanged(object sender, EventArgs e)
+    {
+        if (sender is Picker picker && picker.SelectedItem is ISortStrategy strategy)
+        {
+            _viewModel.ChangeSortStrategyCommand.Execute(strategy);
         }
     }
 }

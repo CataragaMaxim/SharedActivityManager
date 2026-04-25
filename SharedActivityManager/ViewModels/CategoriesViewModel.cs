@@ -6,10 +6,11 @@ using SharedActivityManager.Enums;
 using SharedActivityManager.Models;
 using SharedActivityManager.Services;
 using SharedActivityManager.Services.Adapters;
+using SharedActivityManager.Services.Observers;
 
 namespace SharedActivityManager.ViewModels
 {
-    public partial class CategoriesViewModel : ObservableObject
+    public partial class CategoriesViewModel : ObservableObject, IActivityObserver
     {
         private readonly IActivityService _activityService;
         private readonly CategoryTreeBuilder _treeBuilder;
@@ -68,26 +69,38 @@ namespace SharedActivityManager.ViewModels
             _fileAdapter = new FileAdapterFacade();
             _messagingService = new MessagingService();
 
+            if (_activityService is IActivitySubject subject)
+            {
+                subject.Attach(this);
+                System.Diagnostics.Debug.WriteLine("[CategoriesViewModel] Attached as observer");
+            }
+
             // 🔥 ABONARE LA MESAJE GLOBALE
-            _messagingService.Subscribe<ActivitiesChangedMessage>(this, OnActivitiesChanged);
+            //_messagingService.Subscribe<ActivitiesChangedMessage>(this, OnActivitiesChanged);
 
             LoadCategories();
             LoadExpandedState();
         }
 
-        // 🔥 METODĂ PENTRU A REACȚIONA LA SCHIMBĂRI
-        private async void OnActivitiesChanged(ActivitiesChangedMessage message)
+        public async Task OnActivityChanged(string action, Activity activity = null, int activityCount = 0)
         {
-            System.Diagnostics.Debug.WriteLine($"CategoriesViewModel: Received message - Action: {message.Action}");
+            System.Diagnostics.Debug.WriteLine($"[CategoriesViewModel] Observer received: {action}");
 
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
-                // Reîncarcă toate datele
-                LoadCategories();
-                RefreshDisplayTree();
-                UpdateStatistics();
-
-                System.Diagnostics.Debug.WriteLine($"CategoriesViewModel: Reloaded - Total activities: {TotalActivities}");
+                switch (action)
+                {
+                    case "Added":
+                    case "Updated":
+                    case "Deleted":
+                    case "Copied":
+                    case "Imported":
+                    case "DeletedAll":
+                        LoadCategories();
+                        RefreshDisplayTree();
+                        UpdateStatistics();
+                        break;
+                }
             });
         }
 
@@ -632,6 +645,14 @@ namespace SharedActivityManager.ViewModels
             catch (Exception ex)
             {
                 await _alertService.ShowAlertAsync("XML Test Failed", ex.Message);
+            }
+        }
+
+        ~CategoriesViewModel()
+        {
+            if (_activityService is IActivitySubject subject)
+            {
+                subject.Detach(this);
             }
         }
     }

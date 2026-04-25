@@ -10,11 +10,13 @@ using SharedActivityManager.Models;
 using SharedActivityManager.Repositories;
 using SharedActivityManager.Services;
 using SharedActivityManager.Services.Flyweight;
+using SharedActivityManager.Services.Observers;
 using SharedActivityManager.Services.Proxies;
+using SharedActivityManager.Services.Strategies;
 
 namespace SharedActivityManager.ViewModels
 {
-    public partial class MainViewModel : ObservableObject
+    public partial class MainViewModel : ObservableObject, IActivityObserver    
     {
         // ========== SERVICII ==========
         private readonly IActivityManagementFacade _activityFacade;
@@ -22,7 +24,7 @@ namespace SharedActivityManager.ViewModels
         private readonly IAudioService _audioService;
         private readonly IAlarmService _alarmService;
         private readonly IAlertService _alertService;
-        private readonly IMessagingService _messagingService;
+        //private readonly IMessagingService _messagingService;
 
         // ========== PROPRIETĂȚI ==========
         [ObservableProperty]
@@ -94,6 +96,21 @@ namespace SharedActivityManager.ViewModels
         [ObservableProperty]
         private int _totalExtraCost = 0;
 
+        private readonly SortContext _sortContext;
+
+        [ObservableProperty]
+        private List<ISortStrategy> _availableSortStrategies;
+
+        [ObservableProperty]
+        private ISortStrategy _selectedSortStrategy;
+
+        [ObservableProperty]
+        private SortOrder _selectedSortOrder = SortOrder.Ascending;
+
+        [ObservableProperty]
+        private string _currentSortInfo = "Sorted by Date (Ascending)";
+
+
         // ========== PROPRIETĂȚI CALCULATE ==========
         public DateTime CombinedStartDateTime => SelectedStartDate.Add(SelectedStartTime);
 
@@ -126,20 +143,38 @@ namespace SharedActivityManager.ViewModels
 
             // 🔥 CREEAZĂ LANȚUL DE PROXY-URI
             // Cache -> Security -> Virtual -> Real
+
+            // În MainViewModel constructor, înlocuiește:
+            // _activityService = new RealActivityService(repository, alarmService);
+
+            //// Cu:
+            //var realService = new RealActivityService(repository, alarmService);
+            //_activityService = new VirtualActivityServiceProxy(realService, 20);
             _activityService = ActivityServiceProxyFactory.CreateFullProxyChain(
                 repository,
                 alarmService,
-                "current_user",  // TODO: din sesiunea utilizatorului
-                enableVirtualProxy: true,    // Lazy loading
-                enableSecurityProxy: true,   // Control acces
-                enableCacheProxy: true,      // Caching
+                "current_user",
+                enableVirtualProxy: true,    // 🔥 ACTIVAT (acum funcționează corect)
+                enableSecurityProxy: true,   // 🔥 ACTIVAT
+                enableCacheProxy: true,      // 🔥 ACTIVAT
                 cacheDurationMinutes: 5
             );
+
+            if (_activityService is IActivitySubject subject)
+            {
+                subject.Attach(this);
+                System.Diagnostics.Debug.WriteLine("[MainViewModel] Attached as observer");
+            }
+
+            _sortContext = new SortContext();
+            AvailableSortStrategies = SortContext.GetAllStrategies();
+            SelectedSortStrategy = AvailableSortStrategies.FirstOrDefault(s => s is SortByDateStrategy);
+            SelectedSortOrder = SortOrder.Ascending;
 
             _audioService = audioService;
             _alarmService = alarmService;
             _alertService = alertService;
-            _messagingService = messagingService;
+            //_messagingService = messagingService;
 
             // Inițializare Facade cu serviciile corecte
             _activityFacade = new ActivityManagementFacade(
@@ -147,13 +182,101 @@ namespace SharedActivityManager.ViewModels
                 notificationService, alertService, messagingService);
 
             // Abonare la mesaje
-            _messagingService.Subscribe<ActivitiesChangedMessage>(this, OnActivitiesChanged);
+            //_messagingService.Subscribe<ActivitiesChangedMessage>(this, OnActivitiesChanged);
 
             // Încărcare date
             Task.Run(async () => await LoadActivitiesAsync()).Wait();
             LoadSavedRingtone();
             UpdateNextReminderPreview();
             Task.Run(async () => await RestoreAlarmsAsync());
+        }
+
+        public async Task OnActivityChanged(string action, Activity activity = null, int activityCount = 0)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] Observer received: {action}");
+
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                switch (action)
+                {
+                    case "Added":
+                    case "Updated":
+                    case "Deleted":
+                    case "Copied":
+                        await LoadActivitiesAsync();
+                        break;
+
+                    case "DeletedAll":
+                    case "Imported":
+                        await LoadActivitiesAsync();
+                        if (activityCount > 0)
+                        {
+                            await _alertService.ShowAlertAsync("Success",
+                                $"{activityCount} activities have been processed");
+                        }
+                        break;
+
+                    case "CategoryChanged":
+                        // Reîncarcă doar dacă e necesar
+                        await LoadActivitiesAsync();
+                        break;
+                }
+            });
+        }
+
+        [RelayCommand]
+        private void ChangeSortStrategy(ISortStrategy strategy)
+        {
+            if (strategy == null) return;
+
+            SelectedSortStrategy = strategy;
+            _sortContext.SetStrategy(strategy);
+            _sortContext.SetSortOrder(SelectedSortOrder);
+            CurrentSortInfo = $"{strategy.Name} ({SelectedSortOrder})";
+
+            // Reaplică sortarea pe activitățile curente
+            ApplySorting();
+
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] Sort strategy changed to: {strategy.Name}");
+        }
+
+        // 🔥 COMANDĂ PENTRU SCHIMBAREA ORDINII
+        [RelayCommand]
+        private void ToggleSortOrder()
+        {
+            SelectedSortOrder = SelectedSortOrder == SortOrder.Ascending
+                ? SortOrder.Descending
+                : SortOrder.Ascending;
+
+            _sortContext.SetSortOrder(SelectedSortOrder);
+            CurrentSortInfo = $"{SelectedSortStrategy?.Name} ({SelectedSortOrder})";
+
+            // Reaplică sortarea
+            ApplySorting();
+        }
+
+        // 🔥 METODĂ PENTRU A APLICA SORTAREA PE ACTIVITĂȚILE CURENTE
+        // Adaugă verificări pentru a evita cicluri infinite
+        private void ApplySorting()
+        {
+            // 🔥 Verifică dacă Activities e null
+            if (Activities == null) return;
+
+            // 🔥 Verifică dacă există activități
+            if (!Activities.Any()) return;
+
+            // 🔥 Folosește Task.Run pentru a evita blocarea UI-ului
+            Task.Run(() =>
+            {
+                var currentActivities = Activities.ToList();
+                var sortedList = _sortContext.Sort(currentActivities);
+
+                // Actualizează pe UI thread
+                MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    Activities = new ObservableCollection<Activity>(sortedList);
+                });
+            });
         }
 
         public async Task LoadMoreActivitiesAsync()
@@ -163,6 +286,33 @@ namespace SharedActivityManager.ViewModels
                 // Metodă pentru a încărca mai multe activități
             }
         }
+
+        // Adaugă aceste metode pentru a salva preferințele utilizatorului
+
+        private void SaveSortPreferences()
+        {
+            if (SelectedSortStrategy != null)
+            {
+                Preferences.Set("SortStrategy", SelectedSortStrategy.GetType().Name);
+                Preferences.Set("SortOrder", (int)SelectedSortOrder);
+            }
+        }
+
+        private void LoadSortPreferences()
+        {
+            var savedStrategy = Preferences.Get("SortStrategy", "SortByDateStrategy");
+            var savedOrder = (SortOrder)Preferences.Get("SortOrder", (int)SortOrder.Ascending);
+
+            SelectedSortStrategy = AvailableSortStrategies.FirstOrDefault(s => s.GetType().Name == savedStrategy)
+                                   ?? new SortByDateStrategy();
+            SelectedSortOrder = savedOrder;
+
+            _sortContext.SetStrategy(SelectedSortStrategy);
+            _sortContext.SetSortOrder(SelectedSortOrder);
+            CurrentSortInfo = $"{SelectedSortStrategy.Name} ({SelectedSortOrder})";
+        }
+
+        // Apelează LoadSortPreferences() în constructor și SaveSortPreferences() la schimbare
 
         private async Task CreateActivityWithExtras()
         {
@@ -318,23 +468,23 @@ namespace SharedActivityManager.ViewModels
             await Shell.Current.GoToAsync("//sharedactivities");
         }
 
+        // În MainViewModel.LoadActivitiesAsync()
         [RelayCommand]
         public async Task LoadActivitiesAsync()
         {
             try
             {
                 System.Diagnostics.Debug.WriteLine("MainViewModel: Loading activities...");
-
-                // 🔥 Acum _activityService nu mai e null
                 var activitiesFromDb = await _activityService.GetActivitiesAsync();
-                Activities = new ObservableCollection<Activity>(activitiesFromDb.OrderBy(a => a.StartDate));
+
+                // 🔥 TEMPORAR: Comentează sortarea
+                // var sortedActivities = _sortContext.Sort(activitiesFromDb);
+                // Activities = new ObservableCollection<Activity>(sortedActivities);
+
+                // Folosește direct activitățile fără sortare
+                Activities = new ObservableCollection<Activity>(activitiesFromDb);
 
                 System.Diagnostics.Debug.WriteLine($"MainViewModel: Loaded {Activities.Count} activities");
-
-                foreach (var a in Activities)
-                {
-                    System.Diagnostics.Debug.WriteLine($"- {a.Title} (ID: {a.Id})");
-                }
             }
             catch (Exception ex)
             {
@@ -638,6 +788,14 @@ namespace SharedActivityManager.ViewModels
                     var modal = new ActivityModal(this, activity);
                     await Application.Current.MainPage.Navigation.PushModalAsync(modal);
                     break;
+            }
+        }
+
+        ~MainViewModel()
+        {
+            if (_activityService is IActivitySubject subject)
+            {
+                subject.Detach(this);
             }
         }
     }

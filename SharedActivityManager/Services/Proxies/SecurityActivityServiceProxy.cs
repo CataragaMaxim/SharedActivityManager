@@ -76,26 +76,32 @@ namespace SharedActivityManager.Services.Proxies
 
         public async Task SaveActivityAsync(Activity activity)
         {
-            // Pentru activități noi (Id == 0), tot timpul e permis
-            if (activity.Id == 0)
+            try
             {
-                // Asigură-te că owner-ul e setat corect
-                activity.OwnerId = _currentUserId;
-                System.Diagnostics.Debug.WriteLine($"[SecurityProxy] Creating new activity for user {_currentUserId}");
+                System.Diagnostics.Debug.WriteLine($"[SecurityProxy] Saving activity: {activity.Title}");
+
+                if (activity.Id == 0)
+                {
+                    activity.OwnerId = _currentUserId;
+                    System.Diagnostics.Debug.WriteLine($"[SecurityProxy] Creating new activity for user {_currentUserId}");
+                    await _realService.SaveActivityAsync(activity);
+                    return;
+                }
+
+                var existing = await _realService.GetActivityByIdAsync(activity.Id);
+                if (!CanModify(existing))
+                {
+                    throw new UnauthorizedAccessException("You don't have permission to modify this activity");
+                }
+
                 await _realService.SaveActivityAsync(activity);
-                return;
+                System.Diagnostics.Debug.WriteLine($"[SecurityProxy] Activity saved successfully");
             }
-
-            // Pentru activități existente, verifică permisiunea
-            var existing = await _realService.GetActivityByIdAsync(activity.Id);
-            if (!CanModify(existing))
+            catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[SecurityProxy] User {_currentUserId} cannot modify activity {activity.Id}");
-                throw new UnauthorizedAccessException("You don't have permission to modify this activity");
+                System.Diagnostics.Debug.WriteLine($"[SecurityProxy] Error: {ex.Message}");
+                throw;
             }
-
-            System.Diagnostics.Debug.WriteLine($"[SecurityProxy] User {_currentUserId} is modifying activity {activity.Id}");
-            await _realService.SaveActivityAsync(activity);
         }
 
         public async Task DeleteActivityAsync(Activity activity)

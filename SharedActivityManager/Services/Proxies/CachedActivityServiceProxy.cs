@@ -90,8 +90,34 @@ namespace SharedActivityManager.Services.Proxies
 
         public async Task<List<Activity>> GetActivitiesAsync()
         {
-            var cacheKey = GetCacheKey(nameof(GetActivitiesAsync));
-            return GetOrAddReference(cacheKey, () => _realService.GetActivitiesAsync().Result);
+            try
+            {
+                var cacheKey = GetCacheKey(nameof(GetActivitiesAsync));
+                System.Diagnostics.Debug.WriteLine($"[CacheProxy] GetActivitiesAsync called, key: {cacheKey}");
+
+                if (_cache.TryGetValue(cacheKey, out var cached) && !cached.IsExpired)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[CacheProxy] GetActivitiesAsync - CACHE HIT");
+                    return (List<Activity>)cached.Data;
+                }
+
+                System.Diagnostics.Debug.WriteLine($"[CacheProxy] GetActivitiesAsync - CACHE MISS, calling real service");
+                var result = await _realService.GetActivitiesAsync();
+
+                _cache[cacheKey] = new CachedResult
+                {
+                    Data = result,
+                    ExpiryTime = DateTime.Now.Add(_cacheDuration)
+                };
+
+                System.Diagnostics.Debug.WriteLine($"[CacheProxy] GetActivitiesAsync - Cached {result.Count} activities");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[CacheProxy] GetActivitiesAsync ERROR: {ex.Message}");
+                throw;
+            }
         }
 
         public async Task<Activity> GetActivityByIdAsync(int id)
@@ -101,17 +127,20 @@ namespace SharedActivityManager.Services.Proxies
         }
 
         public async Task SaveActivityAsync(Activity activity)
-        {
-            await _realService.SaveActivityAsync(activity);
-
-            // Invalidează cache-ul pentru activități
-            InvalidateCache(nameof(GetActivitiesAsync));
-            InvalidateCache(nameof(GetActivityByIdAsync));
-            InvalidateCache(nameof(GetTotalActivitiesCountAsync));
-            InvalidateCache(nameof(GetCompletedActivitiesCountAsync));
-
-            System.Diagnostics.Debug.WriteLine($"[CacheProxy] Cache invalidated after saving activity {activity.Id}");
-        }
+{
+    try
+    {
+        System.Diagnostics.Debug.WriteLine($"[CacheProxy] Saving activity: {activity.Title}");
+        await _realService.SaveActivityAsync(activity);
+        InvalidateCache();
+        System.Diagnostics.Debug.WriteLine($"[CacheProxy] Activity saved successfully");
+    }
+    catch (Exception ex)
+    {
+        System.Diagnostics.Debug.WriteLine($"[CacheProxy] Error saving activity: {ex.Message}");
+        throw;
+    }
+}
 
         public async Task DeleteActivityAsync(Activity activity)
         {
@@ -150,8 +179,35 @@ namespace SharedActivityManager.Services.Proxies
 
         public async Task<List<Category>> GetCategoriesAsync()
         {
-            var cacheKey = GetCacheKey(nameof(GetCategoriesAsync));
-            return GetOrAddReference(cacheKey, () => _realService.GetCategoriesAsync().Result);
+            try
+            {
+                var cacheKey = GetCacheKey(nameof(GetCategoriesAsync));
+                System.Diagnostics.Debug.WriteLine($"[CacheProxy] GetCategoriesAsync called, key: {cacheKey}");
+
+                // Verifică manual cache-ul
+                if (_cache.TryGetValue(cacheKey, out var cached) && !cached.IsExpired)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[CacheProxy] GetCategoriesAsync - CACHE HIT");
+                    return (List<Category>)cached.Data;
+                }
+
+                System.Diagnostics.Debug.WriteLine($"[CacheProxy] GetCategoriesAsync - CACHE MISS, calling real service");
+                var result = await _realService.GetCategoriesAsync();
+
+                _cache[cacheKey] = new CachedResult
+                {
+                    Data = result,
+                    ExpiryTime = DateTime.Now.Add(_cacheDuration)
+                };
+
+                System.Diagnostics.Debug.WriteLine($"[CacheProxy] GetCategoriesAsync - Cached {result.Count} categories");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[CacheProxy] GetCategoriesAsync ERROR: {ex.Message}");
+                throw;
+            }
         }
 
         public async Task<Category> GetCategoryByIdAsync(int id)

@@ -5,10 +5,11 @@ using CommunityToolkit.Mvvm.Input;
 using SharedActivityManager.Models;
 using SharedActivityManager.Services;
 using SharedActivityManager.Repositories;
+using SharedActivityManager.Services.Observers;
 
 namespace SharedActivityManager.ViewModels
 {
-    public partial class SharedActivitiesViewModel : ObservableObject
+    public partial class SharedActivitiesViewModel : ObservableObject, IActivityObserver
     {
         private readonly IActivityService _activityService;
         private readonly IAlertService _alertService;
@@ -25,9 +26,36 @@ namespace SharedActivityManager.ViewModels
 
         public SharedActivitiesViewModel()
         {
-            _activityService = new ActivityService(new ActivityRepository());
+            _activityService = new ActivityService(new Repositories.ActivityRepository());
             _alertService = new AlertService();
-            _messagingService = new MessagingService();
+
+            // 🔥 ATTACH OBSERVER LA SERVICE
+            if (_activityService is IActivitySubject subject)
+            {
+                subject.Attach(this);
+                System.Diagnostics.Debug.WriteLine("[SharedActivitiesViewModel] Attached as observer");
+            }
+        }
+
+        public async Task OnActivityChanged(string action, Activity activity = null, int activityCount = 0)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SharedActivitiesViewModel] Observer received: {action}");
+
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                if (action == "Copied" || action == "Added" || action == "Imported")
+                {
+                    await LoadSharedActivities();
+                }
+            });
+        }
+
+        ~SharedActivitiesViewModel()
+        {
+            if (_activityService is IActivitySubject subject)
+            {
+                subject.Detach(this);
+            }
         }
 
         [RelayCommand]
