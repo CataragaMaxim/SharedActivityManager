@@ -49,7 +49,12 @@
                             TextColor="White"
                             CornerRadius="8"
                             HeightRequest="50"/>
-                    
+                    <Button Text="🌉 Test Bridge"
+                            Clicked="OnTestBridgeClicked"
+                            BackgroundColor="#673AB7"
+                            TextColor="White"
+                            CornerRadius="8"
+                            HeightRequest="50"/>
                 </VerticalStackLayout>
             </Border>
 

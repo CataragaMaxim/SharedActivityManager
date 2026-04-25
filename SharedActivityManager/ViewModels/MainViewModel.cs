@@ -10,6 +10,7 @@ using SharedActivityManager.Models;
 using SharedActivityManager.Repositories;
 using SharedActivityManager.Services;
 using SharedActivityManager.Services.Flyweight;
+using SharedActivityManager.Services.Proxies;
 
 namespace SharedActivityManager.ViewModels
 {
@@ -115,25 +116,34 @@ namespace SharedActivityManager.ViewModels
         // ========== CONSTRUCTOR ==========
         public MainViewModel()
         {
-            // 🔥 Inițializare servicii
+            // Obține serviciile de bază
             var repository = new ActivityRepository();
-            var activityService = new ActivityService(repository);
-            var alarmService = PlatformServiceLocator.AlarmService;
-            var audioService = PlatformServiceLocator.AudioService;
-            var notificationService = PlatformServiceLocator.NotificationService;
+            var alarmService = PlatformBridge.Instance.AlarmService;
+            var audioService = PlatformBridge.Instance.AudioService;
+            var notificationService = PlatformBridge.Instance.NotificationService;
             var alertService = new AlertService();
             var messagingService = new MessagingService();
 
-            // 🔥 IMPORTANT: Inițializează toate câmpurile
-            _activityService = activityService;  // ← ASTA LIPSEA!
+            // 🔥 CREEAZĂ LANȚUL DE PROXY-URI
+            // Cache -> Security -> Virtual -> Real
+            _activityService = ActivityServiceProxyFactory.CreateFullProxyChain(
+                repository,
+                alarmService,
+                "current_user",  // TODO: din sesiunea utilizatorului
+                enableVirtualProxy: true,    // Lazy loading
+                enableSecurityProxy: true,   // Control acces
+                enableCacheProxy: true,      // Caching
+                cacheDurationMinutes: 5
+            );
+
             _audioService = audioService;
             _alarmService = alarmService;
             _alertService = alertService;
             _messagingService = messagingService;
 
-            // Inițializare Facade
+            // Inițializare Facade cu serviciile corecte
             _activityFacade = new ActivityManagementFacade(
-                activityService, alarmService, audioService,
+                _activityService, _alarmService, _audioService,
                 notificationService, alertService, messagingService);
 
             // Abonare la mesaje
@@ -143,9 +153,15 @@ namespace SharedActivityManager.ViewModels
             Task.Run(async () => await LoadActivitiesAsync()).Wait();
             LoadSavedRingtone();
             UpdateNextReminderPreview();
-
-            // Restaurare alarme
             Task.Run(async () => await RestoreAlarmsAsync());
+        }
+
+        public async Task LoadMoreActivitiesAsync()
+        {
+            if (_activityService is CachedActivityServiceProxy cached)
+            {
+                // Metodă pentru a încărca mai multe activități
+            }
         }
 
         private async Task CreateActivityWithExtras()

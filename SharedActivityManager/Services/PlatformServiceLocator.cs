@@ -1,8 +1,10 @@
-﻿// Services/PlatformServiceLocator.cs
-using SharedActivityManager.Abstracts.Platforms;
+﻿using SharedActivityManager.Abstracts.Platforms;
 
 namespace SharedActivityManager.Services
 {
+    /// <summary>
+    /// Service locator (legacy) - recomandat să folosești PlatformBridge
+    /// </summary>
     public static class PlatformServiceLocator
     {
         private static IAlarmService _alarmService;
@@ -14,13 +16,7 @@ namespace SharedActivityManager.Services
             get
             {
                 if (_alarmService == null)
-                {
-#if ANDROID
-                    _alarmService = new SharedActivityManager.Platforms.Android.Services.AndroidAlarmService();
-#elif WINDOWS
-                    _alarmService = new SharedActivityManager.Platforms.Windows.Services.WindowsAlarmService();
-#endif
-                }
+                    _alarmService = PlatformBridge.Instance.AlarmService;
                 return _alarmService;
             }
         }
@@ -30,13 +26,7 @@ namespace SharedActivityManager.Services
             get
             {
                 if (_audioService == null)
-                {
-#if ANDROID
-                    _audioService = new SharedActivityManager.Platforms.Android.Services.AndroidAudioService();
-#elif WINDOWS
-                    _audioService = new SharedActivityManager.Platforms.Windows.Services.WindowsAudioService();
-#endif
-                }
+                    _audioService = PlatformBridge.Instance.AudioService;
                 return _audioService;
             }
         }
@@ -46,13 +36,7 @@ namespace SharedActivityManager.Services
             get
             {
                 if (_notificationService == null)
-                {
-#if ANDROID
-                    _notificationService = new SharedActivityManager.Platforms.Android.Services.AndroidNotificationService();
-#elif WINDOWS
-                    _notificationService = new SharedActivityManager.Platforms.Windows.Services.WindowsNotificationService();
-#endif
-                }
+                    _notificationService = PlatformBridge.Instance.NotificationService;
                 return _notificationService;
             }
         }

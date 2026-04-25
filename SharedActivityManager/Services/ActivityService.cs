@@ -98,5 +98,36 @@ namespace SharedActivityManager.Services
 
             return copy;
         }
+
+        public async Task<int> GetTotalActivitiesCountAsync()
+        {
+            var activities = await GetActivitiesAsync();
+            return activities.Count;
+        }
+
+        public async Task<int> GetCompletedActivitiesCountAsync()
+        {
+            var activities = await GetActivitiesAsync();
+            return activities.Count(a => a.IsCompleted);
+        }
+
+        public async Task<int> GetOrCreateCategoryIdAsync(string categoryName, int parentId = 0)
+        {
+            var categories = await GetCategoriesAsync();
+            var existing = categories.FirstOrDefault(c => c.Name == categoryName);
+
+            if (existing != null)
+                return existing.Id;
+
+            var newCategory = new Category
+            {
+                Name = categoryName,
+                ParentCategoryId = parentId,
+                DisplayOrder = 1
+            };
+
+            await SaveCategoryAsync(newCategory);
+            return newCategory.Id;
+        }
     }
 }

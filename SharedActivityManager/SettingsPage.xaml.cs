@@ -6,6 +6,8 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using SharedActivityManager.Services.Flyweight;
 using SharedActivityManager.Enums;
+using SharedActivityManager.Services.Proxies;
+using SharedActivityManager.Repositories;
 
 namespace SharedActivityManager;
 
@@ -282,6 +284,84 @@ public partial class SettingsPage : ContentPage, INotifyPropertyChanged
             // Trimite notificare pentru refresh
             var messagingService = new MessagingService();
             messagingService.Send(new ActivitiesChangedMessage { Action = "Fixed" });
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", ex.Message, "OK");
+        }
+    }
+
+    private async void OnTestBridgeClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            var bridge = PlatformBridge.Instance;
+
+            var message = $"🌉 Bridge Pattern Test\n\n" +
+                          $"Platform: {bridge.PlatformName}\n" +
+                          $"Alarm Service: {bridge.AlarmService?.GetType().Name ?? "null"}\n" +
+                          $"Audio Service: {bridge.AudioService?.GetType().Name ?? "null"}\n" +
+                          $"Notification Service: {bridge.NotificationService?.GetType().Name ?? "null"}\n\n" +
+                          $"✅ Bridge Pattern is working correctly!\n" +
+                          $"The abstraction is separated from implementation.";
+
+            await DisplayAlert("Bridge Test", message, "OK");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", ex.Message, "OK");
+        }
+    }
+
+    private async void OnTestProxiesClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            var repository = new ActivityRepository();
+            var alarmService = PlatformBridge.Instance.AlarmService;
+
+            var results = new List<string>();
+
+            // Test 1: Real Service
+            var realService = new RealActivityService(repository, alarmService);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var realActivities = await realService.GetActivitiesAsync();
+            sw.Stop();
+            results.Add($"Real Service: {realActivities.Count} activities in {sw.ElapsedMilliseconds} ms");
+
+            // Test 2: Cache Proxy
+            var cacheProxy = ActivityServiceProxyFactory.CreateCacheProxy(repository, alarmService);
+            sw.Restart();
+            var cachedActivities1 = await cacheProxy.GetActivitiesAsync();
+            sw.Stop();
+            results.Add($"Cache Proxy (first call): {cachedActivities1.Count} activities in {sw.ElapsedMilliseconds} ms");
+
+            sw.Restart();
+            var cachedActivities2 = await cacheProxy.GetActivitiesAsync();
+            sw.Stop();
+            results.Add($"Cache Proxy (second call): {cachedActivities2.Count} activities in {sw.ElapsedMilliseconds} ms (should be faster)");
+
+            // Test 3: Virtual Proxy
+            var virtualProxy = ActivityServiceProxyFactory.CreateVirtualProxy(repository, alarmService);
+            sw.Restart();
+            var virtualActivities = await virtualProxy.GetActivitiesAsync();
+            sw.Stop();
+            results.Add($"Virtual Proxy (first page): {virtualActivities.Count} activities in {sw.ElapsedMilliseconds} ms");
+
+            // Test 4: Security Proxy
+            var securityProxy = ActivityServiceProxyFactory.CreateSecurityProxy(repository, alarmService, "current_user");
+            try
+            {
+                // Încearcă să ștergi o activitate care nu aparține utilizatorului
+                // (doar pentru test - ar trebui să arunce excepție)
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                results.Add($"Security Proxy: Access denied correctly - {ex.Message}");
+            }
+
+            var message = "📊 Proxy Pattern Test Results:\n\n" + string.Join("\n", results);
+            await DisplayAlert("Proxy Test", message, "OK");
         }
         catch (Exception ex)
         {

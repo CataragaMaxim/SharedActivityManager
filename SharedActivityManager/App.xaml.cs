@@ -11,6 +11,7 @@ public partial class App : Application
         try
         {
             InitializeComponent();
+            PlatformFactory.InitializePlatformBridge();
 
             SingletonTestService.TestDatabaseSingleton();
 

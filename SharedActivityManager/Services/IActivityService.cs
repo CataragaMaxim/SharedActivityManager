@@ -6,7 +6,7 @@ namespace SharedActivityManager.Services
 {
     public interface IActivityService
     {
-        // Metode existente
+        // Activity methods
         Task<List<Activity>> GetActivitiesAsync();
         Task<Activity> GetActivityByIdAsync(int id);
         Task SaveActivityAsync(Activity activity);
@@ -15,14 +15,17 @@ namespace SharedActivityManager.Services
         Task<List<Activity>> GetSharedActivitiesAsync(string currentUserId);
         Task<Activity> CopySharedActivityAsync(Activity sourceActivity, string newOwnerId);
 
-        // Metode pentru categorii
+        // Category methods
         Task<List<Category>> GetCategoriesAsync();
         Task<Category> GetCategoryByIdAsync(int id);
         Task<int> SaveCategoryAsync(Category category);
         Task<int> DeleteCategoryAsync(Category category);
         Task MoveActivityToCategoryAsync(int activityId, int newCategoryId);
-
-        // 🔥 METODĂ NOUĂ
         Task<List<Category>> GetSubCategoriesAsync(int parentId);
+        Task<int> GetOrCreateCategoryIdAsync(string categoryName, int parentId = 0);
+
+        // Statistics
+        Task<int> GetTotalActivitiesCountAsync();
+        Task<int> GetCompletedActivitiesCountAsync();
     }
 }
