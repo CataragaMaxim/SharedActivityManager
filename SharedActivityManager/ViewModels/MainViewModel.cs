@@ -9,6 +9,7 @@ using SharedActivityManager.Enums;
 using SharedActivityManager.Models;
 using SharedActivityManager.Repositories;
 using SharedActivityManager.Services;
+using SharedActivityManager.Services.Commands;
 using SharedActivityManager.Services.Flyweight;
 using SharedActivityManager.Services.Observers;
 using SharedActivityManager.Services.Proxies;
@@ -110,6 +111,20 @@ namespace SharedActivityManager.ViewModels
         [ObservableProperty]
         private string _currentSortInfo = "Sorted by Date (Ascending)";
 
+        private readonly CommandInvoker _commandInvoker;
+
+        [ObservableProperty]
+        private bool _canUndo;
+
+        [ObservableProperty]
+        private bool _canRedo;
+
+        [ObservableProperty]
+        private string _undoCommandName;
+
+        [ObservableProperty]
+        private string _redoCommandName;
+
 
         // ========== PROPRIETĂȚI CALCULATE ==========
         public DateTime CombinedStartDateTime => SelectedStartDate.Add(SelectedStartTime);
@@ -160,6 +175,9 @@ namespace SharedActivityManager.ViewModels
                 cacheDurationMinutes: 5
             );
 
+            _commandInvoker = new CommandInvoker();
+            _commandInvoker.CommandExecuted += OnCommandExecuted;
+
             if (_activityService is IActivitySubject subject)
             {
                 subject.Attach(this);
@@ -189,6 +207,34 @@ namespace SharedActivityManager.ViewModels
             LoadSavedRingtone();
             UpdateNextReminderPreview();
             Task.Run(async () => await RestoreAlarmsAsync());
+        }
+
+        private void OnCommandExecuted(object sender, CommandExecutedEventArgs e)
+        {
+            // Actualizează UI-ul pentru Undo/Redo
+            CanUndo = _commandInvoker.CanUndo;
+            CanRedo = _commandInvoker.CanRedo;
+            UndoCommandName = _commandInvoker.GetUndoCommandName();
+            RedoCommandName = _commandInvoker.GetRedoCommandName();
+
+            System.Diagnostics.Debug.WriteLine($"[ViewModel] UI Updated - CanUndo: {CanUndo}, CanRedo: {CanRedo}");
+        }
+
+        // 🔥 METODE PENTRU UNDO/REDO
+        [RelayCommand]
+        private async Task Undo()
+        {
+            System.Diagnostics.Debug.WriteLine("[ViewModel] Undo requested");
+            await _commandInvoker.Undo();
+            await LoadActivitiesAsync();
+        }
+
+        [RelayCommand]
+        private async Task Redo()
+        {
+            System.Diagnostics.Debug.WriteLine("[ViewModel] Redo requested");
+            await _commandInvoker.Redo();
+            await LoadActivitiesAsync();
         }
 
         public async Task OnActivityChanged(string action, Activity activity = null, int activityCount = 0)
@@ -259,24 +305,21 @@ namespace SharedActivityManager.ViewModels
         // Adaugă verificări pentru a evita cicluri infinite
         private void ApplySorting()
         {
-            // 🔥 Verifică dacă Activities e null
-            if (Activities == null) return;
+            if (Activities == null || !Activities.Any()) return;
 
-            // 🔥 Verifică dacă există activități
-            if (!Activities.Any()) return;
+            var currentList = Activities.ToList();
+            var sortedList = _sortContext.Sort(currentList);
 
-            // 🔥 Folosește Task.Run pentru a evita blocarea UI-ului
-            Task.Run(() =>
+            // 🔥 FOLOSEȘTE Move ÎN LOC DE REASIGNARE PENTRU A MENȚINE REFERINȚA
+            var index = 0;
+            foreach (var item in sortedList)
             {
-                var currentActivities = Activities.ToList();
-                var sortedList = _sortContext.Sort(currentActivities);
-
-                // Actualizează pe UI thread
-                MainThread.InvokeOnMainThreadAsync(() =>
+                if (Activities[index] != item)
                 {
-                    Activities = new ObservableCollection<Activity>(sortedList);
-                });
-            });
+                    Activities.Move(Activities.IndexOf(item), index);
+                }
+                index++;
+            }
         }
 
         public async Task LoadMoreActivitiesAsync()
@@ -477,12 +520,9 @@ namespace SharedActivityManager.ViewModels
                 System.Diagnostics.Debug.WriteLine("MainViewModel: Loading activities...");
                 var activitiesFromDb = await _activityService.GetActivitiesAsync();
 
-                // 🔥 TEMPORAR: Comentează sortarea
-                // var sortedActivities = _sortContext.Sort(activitiesFromDb);
-                // Activities = new ObservableCollection<Activity>(sortedActivities);
-
-                // Folosește direct activitățile fără sortare
-                Activities = new ObservableCollection<Activity>(activitiesFromDb);
+                // 🔥 APLICĂ SORTAREA CURENTĂ
+                var sortedActivities = _sortContext.Sort(activitiesFromDb);
+                Activities = new ObservableCollection<Activity>(sortedActivities);
 
                 System.Diagnostics.Debug.WriteLine($"MainViewModel: Loaded {Activities.Count} activities");
             }
@@ -504,28 +544,7 @@ namespace SharedActivityManager.ViewModels
 
             try
             {
-                // 🔥 OBȚINE CATEGORYID-UL CORECT ÎNAINTE DE A CREA ACTIVITATEA
                 int categoryId = await GetCategoryIdForActivityType(SelectedActivityType);
-
-                var additionalParams = new Dictionary<string, object>();
-
-                switch (SelectedActivityType)
-                {
-                    case ActivityType.Work:
-                        additionalParams["Priority"] = "Medium";
-                        additionalParams["ProjectName"] = "General";
-                        break;
-                    case ActivityType.Health:
-                        additionalParams["DurationSeconds"] = 1800;
-                        additionalParams["WorkoutType"] = "General";
-                        break;
-                    case ActivityType.Study:
-                        additionalParams["Subject"] = "General";
-                        break;
-                    case ActivityType.Personal:
-                        additionalParams["Budget"] = 0m;
-                        break;
-                }
 
                 var newActivity = new Activity
                 {
@@ -542,21 +561,12 @@ namespace SharedActivityManager.ViewModels
                     IsPublic = IsPublic,
                     OwnerId = "current_user",
                     SharedDate = IsPublic ? DateTime.Now : default,
-                    CategoryId = categoryId  // 🔥 ACUM ESTE SETAT CORECT
+                    CategoryId = categoryId
                 };
 
-                System.Diagnostics.Debug.WriteLine($"Creating activity: {newActivity.Title}, Type: {SelectedActivityType}, CategoryId: {categoryId}");
-
-                await _activityFacade.CreateCompleteActivityAsync(
-                    NewTaskTitle,
-                    NewTaskDesc ?? string.Empty,
-                    SelectedActivityType,
-                    CombinedStartDateTime,
-                    AlarmSet,
-                    SelectedReminderType,
-                    SelectedRingTone ?? "Default",
-                    IsPublic,
-                    additionalParams);
+                // 🔥 FOLOSEȘTE COMANDĂ ÎN LOC DE FACADE DIRECT
+                var command = new CreateActivityCommand(_activityService, newActivity);
+                await _commandInvoker.ExecuteCommand(command);
 
                 await LoadActivitiesAsync();
                 ResetForm();
@@ -566,7 +576,6 @@ namespace SharedActivityManager.ViewModels
                 await _alertService.ShowAlertAsync("Error", $"Failed to add activity: {ex.Message}");
             }
         }
-
 
         private async Task<int> GetCategoryIdForActivityType(ActivityType type)
         {
@@ -600,12 +609,9 @@ namespace SharedActivityManager.ViewModels
             System.Diagnostics.Debug.WriteLine($"Created new category: {categoryName} with ID={newCategory.Id}");
             return newCategory.Id;
         }
-
         public async Task SaveEditedActivity()
         {
             if (SelectedActivity == null) return;
-
-            System.Diagnostics.Debug.WriteLine($"=== SaveEditedActivity START ===");
 
             if (string.IsNullOrWhiteSpace(NewTaskTitle))
             {
@@ -615,8 +621,7 @@ namespace SharedActivityManager.ViewModels
 
             try
             {
-                await _alarmService.CancelAlarmAsync(SelectedActivity.Id);
-                await Task.Delay(200);
+                var oldActivity = SelectedActivity.DeepCopy();
 
                 SelectedActivity.Title = NewTaskTitle;
                 SelectedActivity.Desc = NewTaskDesc ?? string.Empty;
@@ -634,14 +639,16 @@ namespace SharedActivityManager.ViewModels
                     SelectedActivity.SharedDate = DateTime.Now;
                 }
 
-                await _activityService.SaveActivityAsync(SelectedActivity);
+                var command = new UpdateActivityCommand(_activityService, oldActivity, SelectedActivity);
+                await _commandInvoker.ExecuteCommand(command);
 
-                if (AlarmSet && !SelectedActivity.IsCompleted)
-                {
-                    await _alarmService.ScheduleAlarmAsync(SelectedActivity);
-                }
+                await LoadActivitiesAsync();  // 🔥 Acest apel deja aplică sortarea
 
-                await LoadActivitiesAsync();
+                IsEditMode = false;
+                PageTitle = "Create New Activity";
+                SelectedActivity = null;
+                ResetForm();
+
                 await _alertService.ShowAlertAsync("Success", "Activity updated successfully!");
             }
             catch (Exception ex)
@@ -660,7 +667,9 @@ namespace SharedActivityManager.ViewModels
 
             try
             {
-                await _activityFacade.DeleteCompleteActivityAsync(activity);
+                // 🔥 FOLOSEȘTE COMANDĂ
+                var command = new DeleteActivityCommand(_activityService, activity);
+                await _commandInvoker.ExecuteCommand(command);
                 await LoadActivitiesAsync();
             }
             catch (Exception ex)
@@ -696,16 +705,18 @@ namespace SharedActivityManager.ViewModels
         {
             if (activity != null)
             {
-                if (!activity.IsCompleted)
+                try
                 {
-                    await _activityFacade.CompleteActivityAsync(activity);
+                    // 🔥 FOLOSEȘTE COMANDĂ
+                    var newStatus = !activity.IsCompleted;
+                    var command = new CompleteActivityCommand(_activityService, activity, newStatus);
+                    await _commandInvoker.ExecuteCommand(command);
+                    await LoadActivitiesAsync();
                 }
-                else
+                catch (Exception ex)
                 {
-                    await _activityFacade.ReactivateActivityAsync(activity);
+                    await _alertService.ShowAlertAsync("Error", $"Failed to toggle completion: {ex.Message}");
                 }
-
-                await LoadActivitiesAsync();
             }
         }
 

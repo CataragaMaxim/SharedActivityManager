@@ -78,16 +78,34 @@ namespace SharedActivityManager.Models
         public Activity DeepCopy()
         {
             Activity clone = (Activity)this.MemberwiseClone();
+
+            // Resetăm ID-ul pentru a fi o activitate nouă
             clone.Id = 0;
+
+            // Păstrăm referința către activitatea originală
             clone.OriginalActivityId = this.Id;
+
+            // Copiem string-urile (sunt reference types)
             clone.Title = string.Copy(this.Title ?? "");
             clone.Desc = string.Copy(this.Desc ?? "");
             clone.RingTone = string.Copy(this.RingTone ?? "");
 
-            if (!string.IsNullOrEmpty(this.AdditionalDataJson))
+            // 🔥 FIX: Asigură-te că SpecificDataJson nu e null
+            if (!string.IsNullOrEmpty(this.SpecificDataJson))
             {
-                clone.AdditionalDataJson = string.Copy(this.AdditionalDataJson);
+                clone.SpecificDataJson = string.Copy(this.SpecificDataJson);
             }
+            else
+            {
+                clone.SpecificDataJson = "{}"; // JSON gol în loc de null
+            }
+
+            // 🔥 FIX: Copiază și celelalte proprietăți
+            clone.VideoUrl = string.Copy(this.VideoUrl ?? "");
+            clone.Notes = string.Copy(this.Notes ?? "");
+            clone.ShoppingItemsJson = string.Copy(this.ShoppingItemsJson ?? "");
+            clone.Priority = string.Copy(this.Priority ?? "");
+            clone.ProjectName = string.Copy(this.ProjectName ?? "");
 
             return clone;
         }
@@ -150,5 +168,40 @@ namespace SharedActivityManager.Models
         public string Priority { get; set; } // Low, Medium, High
         public string ProjectName { get; set; }
         public DateTime? Deadline { get; set; }
+
+        public T GetSpecificData<T>() where T : class, new()
+        {
+            if (string.IsNullOrEmpty(SpecificDataJson) || SpecificDataJson == "{}")
+            {
+                return new T();
+            }
+
+            try
+            {
+                return JsonSerializer.Deserialize<T>(SpecificDataJson) ?? new T();
+            }
+            catch
+            {
+                return new T();
+            }
+        }
+
+        public void SetSpecificData<T>(T data) where T : class
+        {
+            if (data == null)
+            {
+                SpecificDataJson = "{}";
+                return;
+            }
+
+            try
+            {
+                SpecificDataJson = JsonSerializer.Serialize(data);
+            }
+            catch
+            {
+                SpecificDataJson = "{}";
+            }
+        }
     }
 }

@@ -1,5 +1,4 @@
-﻿// Repositories/ActivityRepository.cs
-using SharedActivityManager.Data;
+﻿using SharedActivityManager.Data;
 using SharedActivityManager.Models;
 using SharedActivityManager.Repositories;
 
@@ -27,13 +26,27 @@ namespace SharedActivityManager.Repositories
 
         public async Task<int> SaveActivityAsync(Activity activity)
         {
-            return await _database.SaveActivityAsync(activity);
+            // 🔥 FOLOSEȘTE _database, NU _connection
+            // Verifică dacă activitatea există deja
+            if (activity.Id > 0)
+            {
+                var existing = await _database.GetActivityByIdAsync(activity.Id);
+                if (existing != null)
+                {
+                    // Actualizează activitatea existentă
+                    return await _database.UpdateActivityAsync(activity);
+                }
+            }
+
+            // Activitate nouă - inserează
+            return await _database.InsertActivityAsync(activity);
         }
 
         public async Task<int> DeleteActivityAsync(Activity activity)
         {
             return await _database.DeleteActivityAsync(activity);
         }
+
         public async Task<List<Category>> GetSubCategoriesAsync(int parentId)
         {
             return await _database.GetSubCategoriesAsync(parentId);

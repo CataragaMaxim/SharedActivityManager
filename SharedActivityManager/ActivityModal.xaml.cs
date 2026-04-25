@@ -54,6 +54,12 @@ public partial class ActivityModal : ContentPage
     {
         if (_activityToEdit == null) return;
 
+        // 🔥 FIX: Asigură-te că SpecificDataJson nu e null
+        if (_activityToEdit.SpecificDataJson == null)
+        {
+            _activityToEdit.SpecificDataJson = "{}";
+        }
+
         _viewModel.NewTaskTitle = _activityToEdit.Title;
         _viewModel.NewTaskDesc = _activityToEdit.Desc;
         _viewModel.SelectedActivityType = _activityToEdit.TypeId;
@@ -62,9 +68,7 @@ public partial class ActivityModal : ContentPage
         _viewModel.AlarmSet = _activityToEdit.AlarmSet;
         _viewModel.SelectedReminderType = _activityToEdit.ReminderType;
         _viewModel.SelectedRingTone = _activityToEdit.RingTone ?? "Default Alarm";
-        _viewModel.IsPublic = _activityToEdit.IsPublic;  // ← ACEASTA LIPSEA!
-
-        System.Diagnostics.Debug.WriteLine($"LoadActivityData - IsPublic: {_activityToEdit.IsPublic}");
+        _viewModel.IsPublic = _activityToEdit.IsPublic;
     }
 
     // ===== METODE PENTRU BUTOANE =====

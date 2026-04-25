@@ -88,6 +88,29 @@
                         HeightRequest="40"/>
 
             </HorizontalStackLayout>
+            
+            <HorizontalStackLayout Spacing="10" HorizontalOptions="End">
+                <Label Text="{Binding UndoCommandName, StringFormat='Undo: {0}'}"
+                       FontSize="11"
+                       TextColor="#666666"
+                       IsVisible="{Binding CanUndo}"/>
+                
+                <Button Text="↩️ Undo"
+                        Command="{Binding UndoCommand}"
+                        IsEnabled="{Binding CanUndo}"
+                        BackgroundColor="#2196F3"
+                        TextColor="White"
+                        CornerRadius="8"
+                        Padding="15,10"/>
+
+                <Button Text="↪️ Redo"
+                        Command="{Binding RedoCommand}"
+                        IsEnabled="{Binding CanRedo}"
+                        BackgroundColor="#2196F3"
+                        TextColor="White"
+                        CornerRadius="8"
+                        Padding="15,10"/>
+            </HorizontalStackLayout>
 
         </VerticalStackLayout>
 
